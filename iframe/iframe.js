@@ -1,6 +1,9 @@
 // 全局文件粘贴检测和处理
 let filePasteHandlerAdded = false;
 
+// 跟踪输入法组合输入状态（用于中文输入法）
+let isComposing = false;
+
 // 统一的文件扩展名检测
 const SUPPORTED_FILE_EXTENSIONS = [
   // Office文档类型
@@ -1244,17 +1247,32 @@ document.getElementById('searchButton').addEventListener('click', () => {
   }
 });
 
+// 监听输入法组合输入事件
+document.getElementById('searchInput').addEventListener('compositionstart', () => {
+    isComposing = true;
+    console.log('🎯 输入法组合输入开始');
+});
+
+document.getElementById('searchInput').addEventListener('compositionend', () => {
+    isComposing = false;
+    console.log('🎯 输入法组合输入结束');
+});
+
 // 处理回车键
 document.getElementById('searchInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
+        // 如果正在使用输入法组合输入，不触发查询操作
+        if (isComposing) {
+            console.log('🎯 输入法组合输入中，不触发查询');
+            return; // 让输入法处理回车键
+        }
+        
         e.preventDefault();
         const query = document.getElementById('searchInput').value.trim();
         if (query) {
             shanshuo();
             iframeFresh(query);
-
         }
-        
     }
 });   
 

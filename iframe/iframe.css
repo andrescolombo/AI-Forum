@@ -58,7 +58,7 @@ html {
     z-index: 1000;
     display: flex;
     gap: 10px;
-    max-width: 1200px;
+    max-width: 900px;
     margin: 0 auto;
     justify-content: space-between; /* 改为两端对齐 */
     min-height: 36px; /* 最小高度，允许扩展 */
