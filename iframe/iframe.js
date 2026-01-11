@@ -147,9 +147,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     const columnOptionBtns = document.querySelectorAll('.column-option-btn');
     const iframesContainer = document.getElementById('iframes-container');
 
+    // 检测是否在侧边栏中打开
+    const isSidePanel = window.location.href.includes('side_panel') || 
+                       window.location.search.includes('side_panel') ||
+                       (window.top !== window); // 如果被嵌入，可能是在侧边栏中
+
     // 从存储中获取列数设置
     let { preferredColumns = '3' } = await chrome.storage.sync.get('preferredColumns');
-    if (window.innerWidth < 500) {
+    
+    // 如果在侧边栏中打开，临时使用1列
+    if (isSidePanel || window.innerWidth < 500) {
        preferredColumns = '1';
     }
     
@@ -161,6 +168,17 @@ document.addEventListener('DOMContentLoaded', async function() {
     // 检查 URL 参数，判断打开方式
     const urlParams = new URLSearchParams(window.location.search);
     const hasQueryParam = urlParams.has('query');
+    const hasSitesParam = urlParams.has('sites');
+    
+    // 获取指定的站点列表（如果存在）
+    let selectedSiteNames = null;
+    if (hasSitesParam) {
+        const sitesParam = urlParams.get('sites');
+        if (sitesParam) {
+            selectedSiteNames = sitesParam.split(',').map(name => name.trim()).filter(name => name);
+            console.log('从 URL 参数获取指定的站点列表:', selectedSiteNames);
+        }
+    }
     
     if (hasQueryParam) {
         // 从 URL 参数中获取查询内容
@@ -177,17 +195,35 @@ document.addEventListener('DOMContentLoaded', async function() {
             // 获取站点配置并创建 iframes
             getDefaultSites().then((sites) => {
                 if (sites && sites.length > 0) {
-                    const availableSites = sites.filter(site => 
-                        site.enabled && 
-                        site.supportIframe !== false && 
-                        !site.hidden
-                    );
-
-                    if (availableSites.length > 0) {
-                        console.log('使用查询内容创建 iframes:', query, availableSites);
-                        createIframes(query, availableSites);
+                    // 如果指定了站点列表，优先使用选中的站点（忽略 enabled 状态）
+                    if (selectedSiteNames && selectedSiteNames.length > 0) {
+                        let availableSites = sites.filter(site => 
+                            selectedSiteNames.includes(site.name) &&
+                            site.supportIframe !== false && 
+                            !site.hidden
+                        );
+                        console.log('根据选中的站点列表过滤:', selectedSiteNames, availableSites);
+                        
+                        if (availableSites.length > 0) {
+                            console.log('使用查询内容创建 iframes:', query, availableSites);
+                            createIframes(query, availableSites);
+                        } else {
+                            console.log('没有可用的站点');
+                        }
                     } else {
-                        console.log('没有可用的站点');
+                        // 如果没有指定站点列表，使用默认过滤（需要 enabled）
+                        let availableSites = sites.filter(site => 
+                            site.enabled && 
+                            site.supportIframe !== false && 
+                            !site.hidden
+                        );
+
+                        if (availableSites.length > 0) {
+                            console.log('使用查询内容创建 iframes:', query, availableSites);
+                            createIframes(query, availableSites);
+                        } else {
+                            console.log('没有可用的站点');
+                        }
                     }
                 }
             });
@@ -196,7 +232,61 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.log('URL 参数 query=true，按直接打开处理');
             getDefaultSites().then((sites) => {
                 if (sites && sites.length > 0) {
-                    const availableSites = sites.filter(site => 
+                    // 如果指定了站点列表，优先使用选中的站点（忽略 enabled 状态）
+                    if (selectedSiteNames && selectedSiteNames.length > 0) {
+                        let availableSites = sites.filter(site => 
+                            selectedSiteNames.includes(site.name) &&
+                            site.supportIframe !== false && 
+                            !site.hidden
+                        );
+                        console.log('根据选中的站点列表过滤:', selectedSiteNames, availableSites);
+                        
+                        if (availableSites.length > 0) {
+                            console.log('初始化可用站点:', availableSites);
+                            createIframes('', availableSites);
+                        } else {
+                            console.log('没有可用的站点');
+                        }
+                    } else {
+                        // 如果没有指定站点列表，使用默认过滤（需要 enabled）
+                        let availableSites = sites.filter(site => 
+                            site.enabled && 
+                            site.supportIframe !== false && 
+                            !site.hidden
+                        );
+
+                        if (availableSites.length > 0) {
+                            console.log('初始化可用站点:', availableSites);
+                            createIframes('', availableSites);
+                        } else {
+                            console.log('没有可用的站点');
+                        }
+                    }
+                }
+            });
+        }
+    } else {
+        // 直接打开（方式1）
+        getDefaultSites().then((sites) => {
+            if (sites && sites.length > 0) {
+                // 如果指定了站点列表，优先使用选中的站点（忽略 enabled 状态）
+                if (selectedSiteNames && selectedSiteNames.length > 0) {
+                    let availableSites = sites.filter(site => 
+                        selectedSiteNames.includes(site.name) &&
+                        site.supportIframe !== false && 
+                        !site.hidden
+                    );
+                    console.log('根据选中的站点列表过滤:', selectedSiteNames, availableSites);
+                    
+                    if (availableSites.length > 0) {
+                        console.log('初始化可用站点:', availableSites);
+                        createIframes('', availableSites);
+                    } else {
+                        console.log('没有可用的站点');
+                    }
+                } else {
+                    // 如果没有指定站点列表，使用默认过滤（需要 enabled）
+                    let availableSites = sites.filter(site => 
                         site.enabled && 
                         site.supportIframe !== false && 
                         !site.hidden
@@ -208,24 +298,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                     } else {
                         console.log('没有可用的站点');
                     }
-                }
-            });
-        }
-    } else {
-        // 直接打开（方式1）
-        getDefaultSites().then((sites) => {
-            if (sites && sites.length > 0) {
-                const availableSites = sites.filter(site => 
-                    site.enabled && 
-                    site.supportIframe !== false && 
-                    !site.hidden
-                );
-
-                if (availableSites.length > 0) {
-                    console.log('初始化可用站点:', availableSites);
-                    createIframes('', availableSites);
-                } else {
-                    console.log('没有可用的站点');
                 }
             }
         });

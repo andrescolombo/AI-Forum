@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title data-i18n="appName">MultiAI</title>
+    <link rel="stylesheet" href="homepage.css">
+</head>
+<body>
+    <div class="homepage-container">
+        <div class="search-bar">
+            <div class="search-input-container">
+                <div class="input-wrapper">
+                    <textarea 
+                        id="searchInput" 
+                        placeholder=""
+                        rows="1"
+                    ></textarea>
+                    <button id="searchButton" class="search-btn" data-i18n="startCompare">PK</button>
+                </div>
+                <div id="querySuggestions" class="query-suggestions" style="display: none;">
+                    <!-- queryItem.name 将显示在这里 -->
+                </div>
+            </div>
+        </div>
+        <div class="sites-section">
+            <div class="sites-header">
+                <h3 class="sites-title" data-i18n="selectAISites">选择要使用的 AI 站点</h3>
+            </div>
+            <div id="sitesList" class="sites-list">
+                <!-- 站点列表将通过 JavaScript 动态添加 -->
+            </div>
+        </div>
+    </div>
+    <script src="../config/baseConfig.js"></script>
+    <script src="homepage.js"></script>
+</body>
+</html>
+

@@ -369,10 +369,27 @@ async function executeClick(step) {
   const selectors = Array.isArray(step.selector) ? step.selector : [step.selector];
   
   for (const selector of selectors) {
-    element = document.querySelector(selector);
-    if (element) {
-      foundSelector = selector;
-      break;
+    // 如果选择器是特殊格式 "text:内容"，则通过文本内容查找
+    if (selector.startsWith('text:')) {
+      const textToFind = selector.substring(5);
+      // 查找所有按钮，匹配文本内容
+      const buttons = document.querySelectorAll('button');
+      for (const btn of buttons) {
+        const text = btn.textContent || btn.innerText || btn.getAttribute('aria-label') || '';
+        if (text.toLowerCase().includes(textToFind.toLowerCase())) {
+          element = btn;
+          foundSelector = selector;
+          break;
+        }
+      }
+      if (element) break;
+    } else {
+      // 标准 CSS 选择器
+      element = document.querySelector(selector);
+      if (element) {
+        foundSelector = selector;
+        break;
+      }
     }
   }
   
@@ -427,20 +444,40 @@ async function executeFocus(step) {
   // 支持多个选择器
   const selectors = Array.isArray(step.selector) ? step.selector : [step.selector];
   
-  for (const selector of selectors) {
-    element = document.querySelector(selector);
-    if (element) {
-      foundSelector = selector;
-      break;
+  // 如果指定了重试机制，使用重试逻辑
+  const maxAttempts = step.maxAttempts || (step.waitForElement ? 5 : 1);
+  const retryInterval = step.retryInterval || 200;
+  let attempts = 0;
+  
+  const tryFocus = async () => {
+    // 尝试查找元素
+    for (const selector of selectors) {
+      element = document.querySelector(selector);
+      if (element) {
+        foundSelector = selector;
+        break;
+      }
     }
-  }
+    
+    if (element) {
+      // 元素找到了，执行聚焦
+      element.focus();
+      console.log('聚焦元素:', foundSelector);
+      return;
+    }
+    
+    // 元素未找到，如果允许重试则重试
+    attempts++;
+    if (attempts < maxAttempts && (step.waitForElement || step.maxAttempts)) {
+      console.log(`元素未找到，${retryInterval}ms后重试 (${attempts}/${maxAttempts}): ${selectors.join(', ')}`);
+      await new Promise(resolve => setTimeout(resolve, retryInterval));
+      return tryFocus();
+    } else {
+      throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
+    }
+  };
   
-  if (!element) {
-    throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
-  }
-  
-  element.focus();
-  console.log('聚焦元素:', foundSelector);
+  await tryFocus();
 }
 
 // 执行设置值操作
@@ -451,33 +488,134 @@ async function executeSetValue(step, query) {
   // 支持多个选择器
   const selectors = Array.isArray(step.selector) ? step.selector : [step.selector];
   
-  for (const selector of selectors) {
-    element = document.querySelector(selector);
-    if (element) {
-      foundSelector = selector;
-      break;
-    }
-  }
+  // 如果指定了重试机制，使用重试逻辑
+  const maxAttempts = step.maxAttempts || (step.waitForElement ? 5 : 1);
+  const retryInterval = step.retryInterval || 200;
+  let attempts = 0;
   
-  if (!element) {
-    throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
-  }
+  const trySetValue = async () => {
+    // 尝试查找元素
+    for (const selector of selectors) {
+      element = document.querySelector(selector);
+      if (element) {
+        foundSelector = selector;
+        break;
+      }
+    }
+    
+    if (!element) {
+      // 元素未找到，如果允许重试则重试
+      attempts++;
+      if (attempts < maxAttempts && (step.waitForElement || step.maxAttempts)) {
+        console.log(`元素未找到，${retryInterval}ms后重试 (${attempts}/${maxAttempts}): ${selectors.join(', ')}`);
+        await new Promise(resolve => setTimeout(resolve, retryInterval));
+        return trySetValue();
+      } else {
+        throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
+      }
+    }
+    
+    // 元素找到，继续执行设置值
+    return element;
+  };
+  
+  element = await trySetValue();
 
   if (step.inputType === 'contenteditable') {
-    // 处理 contenteditable 元素
-    const pElement = element.querySelector('p');
-    if (pElement) {
+    // 处理 contenteditable 元素（支持 Tiptap/ProseMirror 等编辑器）
+    // 查找所有 p 元素，清空并替换为新内容
+    const pElements = element.querySelectorAll('p');
+    
+    if (pElements.length > 0) {
+      // 如果存在 p 元素，清空所有并只保留第一个
+      if (pElements.length > 1) {
+        // 如果有多个 p 元素，删除多余的
+        for (let i = 1; i < pElements.length; i++) {
+          pElements[i].remove();
+        }
+      }
+      const pElement = pElements[0];
+      // 移除空状态类（如 is-empty, is-editor-empty）
+      pElement.classList.remove('is-empty', 'is-editor-empty');
+      // 设置文本内容
       pElement.innerText = query;
+      // 如果没有内容，保留空 p 元素，但移除占位符类
+      if (!query.trim()) {
+        pElement.innerHTML = '';
+      }
     } else {
+      // 如果没有 p 元素，创建一个新的
       element.innerHTML = '<p></p>';
-      element.querySelector('p').innerText = query;
+      const newP = element.querySelector('p');
+      if (newP) {
+        newP.innerText = query;
+      }
     }
   } else if (step.inputType === 'special') {
     // 使用配置驱动的特殊处理
     await executeSpecialSetValue(step, query, element);
+  } else if (step.inputType === 'angular') {
+    // 处理 Angular FormControl（如 Google AI Studio）
+    // Angular FormControl 的值由框架管理，不会直接反映在 DOM 中
+    // 需要通过事件来触发 Angular 的变更检测
+    
+    // 方法1: 设置值并触发事件
+    element.focus();
+    element.value = query;
+    
+    // 触发 input 事件（使用 InputEvent，Angular 监听此事件）
+    const inputEvent = new InputEvent('input', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: query
+    });
+    element.dispatchEvent(inputEvent);
+    
+    // 触发 change 事件
+    const changeEvent = new Event('change', {
+      bubbles: true,
+      cancelable: true
+    });
+    element.dispatchEvent(changeEvent);
+    
+    // 如果元素有 formControlName 属性，尝试直接访问 Angular FormControl
+    // 注意：这需要 Angular 的调试模式或特定上下文
+    try {
+      // 尝试通过 Angular 的 __ngContext__ 访问 FormControl
+      const ngElement = element;
+      if (ngElement.__ngContext__) {
+        // 找到对应的 FormControl 并设置值
+        const context = ngElement.__ngContext__;
+        for (let i = 0; i < context.length; i++) {
+          if (context[i] && typeof context[i].setValue === 'function') {
+            context[i].setValue(query);
+            console.log('通过 Angular FormControl API 设置值');
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      // 如果无法访问 Angular API，继续使用事件方式
+      console.log('无法访问 Angular FormControl API，使用事件方式');
+    }
+    
+    // 再次触发 focus（保持焦点）
+    element.focus();
+    
+    console.log('Angular FormControl 值已设置并触发事件');
   } else {
     // 普通输入框
     element.value = query;
+    
+    // 触发 input 事件确保框架能够检测到变化
+    const inputEvent = new InputEvent('input', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: query
+    });
+    element.dispatchEvent(inputEvent);
   }
 
   console.log('设置元素值:', foundSelector);
@@ -643,17 +781,45 @@ async function executeTriggerEvents(step) {
   // 支持多个选择器
   const selectors = Array.isArray(step.selector) ? step.selector : [step.selector];
   
-  for (const selector of selectors) {
-    element = document.querySelector(selector);
-    if (element) {
-      foundSelector = selector;
-      break;
-    }
-  }
+  // 如果指定了重试机制，使用重试逻辑
+  const maxAttempts = step.maxAttempts || (step.waitForElement ? 5 : 1);
+  const retryInterval = step.retryInterval || 200;
+  let attempts = 0;
   
-  if (!element) {
-    throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
-  }
+  const tryTriggerEvents = async () => {
+    // 尝试查找元素
+    let foundElement = null;
+    let foundSel = null;
+    
+    for (const selector of selectors) {
+      foundElement = document.querySelector(selector);
+      if (foundElement) {
+        foundSel = selector;
+        break;
+      }
+    }
+    
+    if (!foundElement) {
+      // 元素未找到，如果允许重试则重试
+      attempts++;
+      if (attempts < maxAttempts && (step.waitForElement || step.maxAttempts)) {
+        console.log(`元素未找到，${retryInterval}ms后重试 (${attempts}/${maxAttempts}): ${selectors.join(', ')}`);
+        await new Promise(resolve => setTimeout(resolve, retryInterval));
+        return tryTriggerEvents();
+      } else {
+        throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
+      }
+    }
+    
+    // 元素找到，设置变量并继续执行触发事件
+    element = foundElement;
+    foundSelector = foundSel;
+    return { element: foundElement, selector: foundSel };
+  };
+  
+  const result = await tryTriggerEvents();
+  element = result.element;
+  foundSelector = result.selector;
 
   const events = step.events || ['input', 'change'];
   events.forEach(eventName => {
@@ -694,6 +860,10 @@ async function executeSendKeys(step, query) {
     throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
   }
 
+  // 检测平台（Mac 使用 Command/Meta，Windows/Linux 使用 Ctrl）
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0 || 
+                navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+
   if (step.keys === 'Enter') {
     const enterEvent = new KeyboardEvent('keydown', {
       bubbles: true,
@@ -708,6 +878,86 @@ async function executeSendKeys(step, query) {
     });
     element.dispatchEvent(enterEvent);
     console.log('发送回车键到元素:', foundSelector);
+  } else if (step.keys === '⌘ + Enter' || step.keys === 'Command+Enter' || step.keys === 'Meta+Enter') {
+    // 处理 ⌘ + Enter 组合键
+    // Mac 使用 Meta (Command) 键，Windows/Linux 使用 Ctrl 键
+    const metaKey = isMac; // Mac 使用 metaKey
+    const ctrlKey = !isMac; // Windows/Linux 使用 ctrlKey
+    
+    // 先触发 keydown 事件，包含修饰键
+    const keyDownEvent = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      location: 0,
+      repeat: false,
+      isComposing: false,
+      ctrlKey: ctrlKey,
+      metaKey: metaKey,
+      shiftKey: false,
+      altKey: false
+    });
+    element.dispatchEvent(keyDownEvent);
+    
+    // 再触发 keyup 事件，包含修饰键
+    const keyUpEvent = new KeyboardEvent('keyup', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      location: 0,
+      repeat: false,
+      isComposing: false,
+      ctrlKey: ctrlKey,
+      metaKey: metaKey,
+      shiftKey: false,
+      altKey: false
+    });
+    element.dispatchEvent(keyUpEvent);
+    
+    console.log(`发送 ${isMac ? '⌘ + Enter (Meta+Enter)' : 'Ctrl + Enter'} 到元素:`, foundSelector);
+  } else if (step.keys === 'Ctrl+Enter' || step.keys === 'Control+Enter') {
+    // 处理 Ctrl + Enter 组合键
+    const keyDownEvent = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      location: 0,
+      repeat: false,
+      isComposing: false,
+      ctrlKey: true,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false
+    });
+    element.dispatchEvent(keyDownEvent);
+    
+    const keyUpEvent = new KeyboardEvent('keyup', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      location: 0,
+      repeat: false,
+      isComposing: false,
+      ctrlKey: true,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false
+    });
+    element.dispatchEvent(keyUpEvent);
+    
+    console.log('发送 Ctrl + Enter 到元素:', foundSelector);
   } else {
     console.warn('不支持的按键类型:', step.keys);
   }

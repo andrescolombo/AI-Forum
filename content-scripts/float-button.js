@@ -147,8 +147,7 @@ async function createFloatButton() {
   document.body.appendChild(container);
   document.body.appendChild(dialog);
 
-  // 加载站点列表
-  loadSites();
+ 
   
   // 初始化时就设置具体的 top 值，而不是用 transform
   const initialTop = window.innerHeight / 2 - container.offsetHeight / 2;
@@ -257,75 +256,8 @@ async function createFloatButton() {
   });
 }
 
-// 加载站点列表
-async function loadSites() {
-  console.log('loadSites');
-  const sites = await window.getDefaultSites();
-  const visibleSites = sites.filter(site => !site.hidden);
-  const siteList = document.querySelector('.multi-ai-dialog .site-list');
-  
-  visibleSites.forEach(site => {
-    const div = document.createElement('div');
-    div.className = 'site-item';
-    div.innerHTML = `
-      <input type="checkbox" 
-             id="site_${site.name}" 
-             ${site.enabled ? 'checked' : ''}>
-      <label for="site_${site.name}">${site.name}</label>
-      <img src="${chrome.runtime.getURL('icons/发送-24.png')}" 
-           class="send-icon"
-           title="单独使用此AI">
-    `;
-    siteList.appendChild(div);
-    // 为发送图标添加点击事件
-    const sendIcon = div.querySelector('.send-icon');
-    sendIcon.addEventListener('click', (e) => {
-      e.stopPropagation(); // 阻止事件冒泡
-      const input = document.querySelector('#multiAiInput');  // 获取输入框元素
-      const query = input.value.trim();
-      if(!query) {
-        input.classList.add('shake');
-        setTimeout(() => {
-          input.classList.remove('shake');
-        }, 500);  // 500ms 后移除闪烁效果
-        return;
-      }
-      
-      const siteName = site.name;
-      
-      // 发送消息到 background
-      chrome.runtime.sendMessage({
-        action: 'singleSiteSearch',
-        query: query,
-        siteName: siteName
-      });
-    });
 
-    // 如果需要监听状态变化
-    document.querySelector(`#site_${site.name}`).addEventListener('change', function(e) {
-      // 不需要手动修改 checked，浏览器会自动处理
-      console.log(`${site.name} checked状态: ${e.target.checked}`);
-    });
 
-  });
-}
-
-// 获取选中的站点
-function getSelectedSites() {
-  const checkboxes = document.querySelectorAll('.multi-ai-dialog .site-item input[type="checkbox"]');
-  
-  // 调试代码，检查每个复选框的状态
-  checkboxes.forEach(cb => {
-    console.log(`${cb.id}: checked = ${cb.checked}`);
-  });
-
-  return Array.from(checkboxes)
-    .filter(cb => {
-      // 确保只返回真正被选中的复选框
-      return cb.checked === true;  // 显式比较
-    })
-    .map(cb => cb.id.replace('site_', ''));
-}
 
 // 显示关闭选项对话框
 function showCloseOptionsDialog(container, event) {
