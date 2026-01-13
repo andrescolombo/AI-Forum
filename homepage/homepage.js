@@ -90,6 +90,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     // 初始化国际化
     initializeI18n();
     
+    // 检查是否需要显示 pin 引导提示（仅首次安装时）
+    await checkAndShowPinGuide();
+    
     // 加载提示词模板建议
     await initializeQuerySuggestions();
     
@@ -227,6 +230,50 @@ async function showQuerySuggestions(query) {
     }
 }
 
+// 检查并显示 pin 引导提示（仅首次安装时）
+async function checkAndShowPinGuide() {
+    try {
+        // 检查是否已经显示过引导
+        const { pinGuideShown } = await chrome.storage.local.get(['pinGuideShown']);
+        
+        // 如果已经显示过，不显示
+        if (pinGuideShown === true) {
+            return;
+        }
+        
+        // 如果是首次安装（pinGuideShown 为 false 或 undefined），显示引导
+        showPinGuide();
+    } catch (error) {
+        console.error('检查 pin 引导失败:', error);
+    }
+}
+
+// 显示 pin 引导提示
+function showPinGuide() {
+    const pinGuideBanner = document.getElementById('pinGuideBanner');
+    if (!pinGuideBanner) {
+        return;
+    }
+    
+    pinGuideBanner.style.display = 'block';
+    
+    // 设置 pin 图片路径
+    const pinGuideImage = document.getElementById('pinGuideImage');
+    if (pinGuideImage) {
+        pinGuideImage.src = chrome.runtime.getURL('icons/pin.png');
+    }
+    
+    // 绑定关闭按钮事件
+    const closeButton = document.getElementById('pinGuideClose');
+    if (closeButton) {
+        closeButton.addEventListener('click', async () => {
+            pinGuideBanner.style.display = 'none';
+            // 标记为已显示，以后不再显示
+            await chrome.storage.local.set({ pinGuideShown: true });
+        });
+    }
+}
+
 function handleQuery(query) {
     // 解析输入文本（如果有前缀，去掉前缀）
     const processedQuery = query.replace(/^ai\s+/, '').trim();
@@ -285,11 +332,9 @@ async function initializeSitesList() {
             site.supportIframe === true && !site.hidden
         );
         
+        console.log('从getDefaultSites() 获取的可以使用的站点:', supportedSites.map(site => ({ name: site.name, enabled: site.enabled })));
         // 清空列表
         sitesList.innerHTML = '';
-        
-        // 从存储中读取用户设置，确定默认选中状态
-        const { sites: userSettings = {} } = await chrome.storage.sync.get('sites');
         
         // 创建站点项
         const fragment = document.createDocumentFragment();
@@ -303,9 +348,12 @@ async function initializeSitesList() {
             checkbox.className = 'site-checkbox';
             checkbox.id = `site-${site.name}`;
             
-            // 根据用户设置确定是否选中（默认为 enabled 状态）
-            const userSiteData = userSettings[site.name] || {};
-            checkbox.checked = userSiteData.enabled !== undefined ? userSiteData.enabled : (site.enabled !== false);
+            // 直接使用 getDefaultSites() 返回的 site.enabled 值（已合并用户设置和基础配置）
+            checkbox.checked = site.enabled === true;
+            // 调试日志
+            if (site.name === 'ChatGPT') {
+                console.log('ChatGPT enabled 值:', site.enabled, '类型:', typeof site.enabled, '严格等于true:', site.enabled === true, 'checkbox.checked:', checkbox.checked);
+            }
             
             const nameLabel = document.createElement('label');
             nameLabel.textContent = site.name;

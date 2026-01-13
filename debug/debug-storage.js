@@ -5,7 +5,8 @@ let globalData = {
     local: null,
     sync: null,
     config: null,
-    remote: null
+    remote: null,
+    merged: null
 };
 
 // 工具函数：格式化 JSON
@@ -216,6 +217,72 @@ async function loadLocalConfig() {
     }
 }
 
+// 加载合并后的站点
+async function loadMergedSites() {
+    const statusEl = document.getElementById('merged-status');
+    const contentEl = document.getElementById('merged-content');
+    
+    try {
+        console.log('开始加载合并后的站点...');
+        statusEl.innerHTML = '<div class="loading-spinner"></div> 正在加载...';
+        statusEl.className = 'status loading';
+
+        if (!window.getDefaultSites) {
+            throw new Error('getDefaultSites 函数未找到 - 请确保 baseConfig.js 已正确加载');
+        }
+
+        const mergedSites = await window.getDefaultSites();
+        console.log('合并后的站点数据:', mergedSites);
+        globalData.merged = mergedSites;
+
+        statusEl.textContent = '✅ 加载成功';
+        statusEl.className = 'status success';
+        
+        // 创建表格显示站点名称和 enabled 状态
+        if (Array.isArray(mergedSites) && mergedSites.length > 0) {
+            const tableHTML = `
+                <table class="sites-table">
+                    <thead>
+                        <tr>
+                            <th>站点名称</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${mergedSites.map(site => `
+                            <tr>
+                                <td>${site.name || '未知站点'}</td>
+                                <td>
+                                    <span class="status-badge ${site.enabled ? 'enabled' : 'disabled'}">
+                                        ${site.enabled ? '✓ 启用' : '✗ 禁用'}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            contentEl.innerHTML = tableHTML;
+        } else {
+            contentEl.innerHTML = '<div class="error-message">暂无站点数据</div>';
+        }
+        
+        const stats = getObjectStats(mergedSites);
+        renderStats(stats, 'merged-stats');
+
+        console.log('合并后的站点加载完成');
+
+    } catch (error) {
+        console.error('加载合并后的站点失败:', error);
+        statusEl.textContent = `❌ 加载失败: ${error.message}`;
+        statusEl.className = 'status error';
+        contentEl.innerHTML = `<div class="error-message">
+            错误详情: ${error.message}<br>
+            错误堆栈: ${error.stack?.slice(0, 200)}...
+        </div>`;
+    }
+}
+
 // 加载远程配置
 async function loadRemoteConfig() {
     const statusEl = document.getElementById('remote-status');
@@ -296,7 +363,8 @@ async function refreshAll() {
         loadLocalStorage(),
         loadSyncStorage(),
         loadLocalConfig(),
-        loadRemoteConfig()
+        loadRemoteConfig(),
+        loadMergedSites()
     ]);
     console.log('全部数据刷新完成');
 }
@@ -324,7 +392,8 @@ function exportAll() {
         local: globalData.local,
         sync: globalData.sync,
         config: globalData.config,
-        remote: globalData.remote
+        remote: globalData.remote,
+        merged: globalData.merged
     };
 
     const dataStr = JSON.stringify(exportData, null, 2);
@@ -458,6 +527,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'loadRemoteConfig':
                     loadRemoteConfig();
                     break;
+                case 'loadMergedSites':
+                    loadMergedSites();
+                    break;
             }
         }
         
@@ -477,6 +549,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'column-4':
                     loadRemoteConfig();
                     break;
+                case 'column-5':
+                    loadMergedSites();
+                    break;
             }
         }
     });
@@ -490,3 +565,4 @@ window.loadLocalStorage = loadLocalStorage;
 window.loadSyncStorage = loadSyncStorage;
 window.loadLocalConfig = loadLocalConfig;
 window.loadRemoteConfig = loadRemoteConfig;
+window.loadMergedSites = loadMergedSites;

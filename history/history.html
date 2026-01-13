@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>历史记录</title>
+    <link rel="stylesheet" href="history.css">
+</head>
+<body>
+    <div class="history-container">
+        <div class="history-header">
+            <h1>PK 历史记录</h1>
+            <button id="clearHistoryBtn" class="clear-btn">清空历史</button>
+        </div>
+        <div id="historyList" class="history-list">
+            <!-- 历史记录将动态加载到这里 -->
+        </div>
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-icon">📋</div>
+            <div class="empty-text">暂无历史记录</div>
+            <div class="empty-hint">执行 PK 操作后，历史记录将显示在这里</div>
+        </div>
+    </div>
+    <script src="../config/baseConfig.js"></script>
+    <script src="history.js"></script>
+</body>
+</html>

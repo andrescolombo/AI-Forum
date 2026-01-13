@@ -200,6 +200,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     if (details.reason === 'install') {
       console.log('首次安装，初始化用户设置');
       
+      // 标记为新用户（用于显示 pin 引导）
+      await chrome.storage.local.set({ 
+        pinGuideShown: false 
+      });
+      console.log('已标记为新用户（pinGuideShown: false）');
+      
       // 处理 favoriteSites 数据
       if (!favoriteSites || !favoriteSites.length) {
         const defaultFavoriteSites = await self.AppConfigManager.getDefaultFavoriteSites();

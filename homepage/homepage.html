@@ -7,6 +7,21 @@
 </head>
 <body>
     <div class="homepage-container">
+        <!-- Pin 引导提示 -->
+        <div id="pinGuideBanner" class="pin-guide-banner" style="display: none;">
+            <div class="pin-guide-content">
+                <div class="pin-guide-icon">📌</div>
+                <div class="pin-guide-text">
+                    <div class="pin-guide-title" data-i18n="pinGuideTitle">Pin the extension for quick access</div>
+                    <div class="pin-guide-steps" data-i18n="pinGuideSteps">Click the puzzle icon in the toolbar → Find "AI Compare" → Click the pin icon</div>
+                </div>
+                <img id="pinGuideImage" src="" alt="Pin" class="pin-guide-image">
+                <button id="pinGuideClose" class="pin-guide-close" aria-label="Close">×</button>
+            </div>
+        </div>
+        <div class="extension-icon-container">
+            <h1 id="extensionName" class="extension-name" data-i18n="shortName">AI Compare</h1>
+        </div>
         <div class="search-bar">
             <div class="search-input-container">
                 <div class="input-wrapper">
@@ -24,7 +39,7 @@
         </div>
         <div class="sites-section">
             <div class="sites-header">
-                <h3 class="sites-title" data-i18n="selectAISites">选择要使用的 AI 站点</h3>
+                <h3 class="sites-title" data-i18n="selectAISites">AI sites</h3>
             </div>
             <div id="sitesList" class="sites-list">
                 <!-- 站点列表将通过 JavaScript 动态添加 -->

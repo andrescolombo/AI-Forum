@@ -877,6 +877,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const searchInput = document.getElementById('searchInput');
     searchInput.value = message.query;
     createIframes(message.query, message.sites);
+  } else if (message.type === 'loadHistoryIframes') {
+    console.log('开始加载历史记录 iframes:', message.sites);
+    loadHistoryIframes(message.sites);
   }
 });
 
@@ -1308,17 +1311,6 @@ document.getElementById('searchButton').addEventListener('click', () => {
   }
 });
 
-// 删除重复的 createIframes 函数声明
-
-// 添加搜索按钮
-document.getElementById('searchButton').addEventListener('click', () => {
-  const query = document.getElementById('searchInput').value.trim();
-  if (query) {
-    shanshuo();
-    iframeFresh(query);
-  }
-});
-
 // 监听输入法组合输入事件
 document.getElementById('searchInput').addEventListener('compositionstart', () => {
     isComposing = true;
@@ -1489,29 +1481,33 @@ async function initializeSiteSettings() {
                 // 获取所有复选框
                 const checkboxes = document.querySelectorAll('.site-checkbox');
                 
-                // 获取当前所有站点配置
-                const currentSites = await window.getDefaultSites();
+                // 从 chrome.storage.sync 读取现有的用户设置
+                const { sites: existingUserSettings = {} } = await chrome.storage.sync.get('sites');
                 
-                // 更新站点启用状态到用户设置中
-                const userSettings = {};
-                currentSites.forEach(site => {
-                    // 找到对应的复选框
-                    const checkbox = document.querySelector(`#site-${site.name}`);
-                    if (checkbox) {
-                        // 如果找到复选框，根据复选框状态设置 enabled
-                        userSettings[site.name] = {
-                            enabled: checkbox.checked
-                        };
+                // 合并现有设置和新的设置
+                const updatedUserSettings = { ...existingUserSettings };
+                
+                // 遍历所有复选框，保存每个站点的 enabled 状态
+                checkboxes.forEach(checkbox => {
+                    // 从 checkbox 的 ID 中提取站点名称 (格式: site-{siteName})
+                    const siteName = checkbox.id.replace('site-', '');
+                    if (siteName) {
+                        // 如果站点在 sync 中不存在，创建新条目
+                        if (!updatedUserSettings[siteName]) {
+                            updatedUserSettings[siteName] = {};
+                        }
+                        // 更新 enabled 状态，保留其他字段（如 order）
+                        updatedUserSettings[siteName].enabled = checkbox.checked;
                     }
                 });
                 
                 // 保存用户设置到 sync storage
-                await chrome.storage.sync.set({ sites: userSettings });
+                await chrome.storage.sync.set({ sites: updatedUserSettings });
                 
                 // 显示成功提示
                 showToast('设置已保存');
                 
-                console.log('站点设置已更新:', userSettings);
+                console.log('站点设置已更新:', updatedUserSettings);
                 
             } catch (error) {
                 console.error('保存站点设置失败:', error);
@@ -1803,7 +1799,10 @@ async function iframeFresh(query) {
         }
     });
     
-
+    // 等待所有 iframe 加载完成后，记录历史
+    setTimeout(async () => {
+      await savePKHistory(query);
+    }, 3000); // 等待3秒让所有 iframe 加载完成
       
       
   
@@ -1812,6 +1811,192 @@ async function iframeFresh(query) {
 }
 
 
+
+// 从历史记录加载 iframe
+async function loadHistoryIframes(sites) {
+  try {
+    const container = document.getElementById('iframes-container');
+    if (!container) {
+      console.error('未找到 iframes 容器');
+      return;
+    }
+    
+    // 清空现有 iframe
+    container.innerHTML = '';
+    
+    // 移除现有的导航栏
+    const existingNav = document.querySelector('.nav');
+    if (existingNav) {
+      existingNav.remove();
+    }
+    
+    // 调整主容器样式以适应导航栏
+    container.style.marginLeft = '72px';
+    
+    // 为每个站点创建 iframe，直接使用历史记录中的 URL（不进行任何处理）
+    sites.forEach(site => {
+      const siteName = site.name;
+      const url = site.url; // 直接使用历史记录中保存的 URL
+      
+      console.log('从历史记录创建 iframe:', siteName, url);
+      
+      // 创建 iframe 容器
+      const iframeContainer = document.createElement('div');
+      iframeContainer.className = 'iframe-container';
+      
+      const iframe = document.createElement('iframe');
+      iframe.className = 'ai-iframe';
+      iframe.setAttribute('data-site', siteName);
+      iframe.allow = 'clipboard-read; clipboard-write; microphone; camera; geolocation; autoplay; fullscreen; picture-in-picture; storage-access; web-share';
+      iframe.src = url; // 直接使用历史记录中的 URL
+      
+      // 创建 header
+      const header = document.createElement('div');
+      header.className = 'iframe-header';
+      header.innerHTML = `
+        <span class="site-name">${siteName}</span>
+        <div class="iframe-controls">
+          <button class="close-btn"></button>
+        </div>
+      `;
+      
+      // 添加关闭按钮事件
+      const closeBtn = header.querySelector('.close-btn');
+      closeBtn.onclick = () => {
+        iframeContainer.remove();
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+          if (item.textContent.trim() === siteName) {
+            item.remove();
+          }
+        });
+      };
+      
+      // 组装元素
+      iframeContainer.appendChild(header);
+      iframeContainer.appendChild(iframe);
+      container.appendChild(iframeContainer);
+    });
+    
+    // 创建导航栏
+    const nav = document.createElement('nav');
+    nav.className = 'nav';
+    
+    const navList = document.createElement('ul');
+    navList.className = 'nav-list';
+    
+    sites.forEach((site, index) => {
+      const navItem = document.createElement('li');
+      navItem.className = 'nav-item';
+      navItem.textContent = site.name;
+      navItem.dataset.siteName = site.name;
+      navItem.dataset.originalIndex = index;
+      
+      // 点击导航项时滚动到对应的iframe
+      navItem.addEventListener('click', () => {
+        navList.querySelectorAll('li').forEach(item => {
+          item.style.backgroundColor = '';
+          item.classList.remove('active');
+        });
+        
+        navItem.style.backgroundColor = '#e0e0e0';
+        navItem.classList.add('active');
+        
+        const iframes = container.querySelectorAll('.iframe-container');
+        if (iframes[index]) {
+          iframes[index].scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+      
+      navList.appendChild(navItem);
+    });
+    
+    nav.appendChild(navList);
+    document.body.insertBefore(nav, container);
+    
+    // 设置搜索框的值（如果有的话）
+    const urlParams = new URLSearchParams(window.location.search);
+    const query = urlParams.get('query');
+    if (query) {
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput) {
+        searchInput.value = query;
+      }
+    }
+    
+  } catch (error) {
+    console.error('加载历史记录 iframe 失败:', error);
+  }
+}
+
+// 保存 PK 历史记录
+async function savePKHistory(query) {
+  try {
+    if (!query || query.trim() === '') {
+      return; // 如果查询为空，不保存
+    }
+    
+    // 获取所有 iframe
+    const iframes = document.querySelectorAll('.ai-iframe');
+    if (iframes.length === 0) {
+      return; // 如果没有 iframe，不保存
+    }
+    
+    // 收集所有 iframe 的 URL 和站点名
+    const sites = [];
+    iframes.forEach(iframe => {
+      try {
+        const siteName = iframe.getAttribute('data-site');
+        const currentUrl = iframe.src;
+        
+        if (siteName && currentUrl) {
+          sites.push({
+            name: siteName,
+            url: currentUrl
+          });
+        }
+      } catch (error) {
+        console.error('收集 iframe 信息失败:', error);
+      }
+    });
+    
+    if (sites.length === 0) {
+      return; // 如果没有有效的站点信息，不保存
+    }
+    
+    // 创建历史记录项
+    const historyItem = {
+      id: Date.now().toString(),
+      query: query.trim(),
+      sites: sites,
+      timestamp: Date.now(),
+      date: new Date().toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    };
+    
+    // 从存储中获取现有历史记录
+    const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
+    
+    // 将新记录添加到开头
+    const updatedHistory = [historyItem, ...pkHistory];
+    
+    // 限制历史记录数量（最多保存100条）
+    const maxHistory = 100;
+    const limitedHistory = updatedHistory.slice(0, maxHistory);
+    
+    // 保存到存储
+    await chrome.storage.local.set({ pkHistory: limitedHistory });
+    
+    console.log('PK 历史记录已保存:', historyItem);
+  } catch (error) {
+    console.error('保存 PK 历史记录失败:', error);
+  }
+}
 
 // 在页面加载时调用
 document.addEventListener('DOMContentLoaded', async () => {

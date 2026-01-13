@@ -84,6 +84,7 @@
     "resources": [
       "iframe/*",
       "homepage/*",
+      "history/*",
       "icons/*",
       "config/*",
       "content-scripts/*",

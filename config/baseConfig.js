@@ -6,7 +6,7 @@ if (typeof window !== 'undefined' && window.BaseConfigLoaded) {
 
 // 开发环境配置
 const DEV_CONFIG = {
-  IS_PRODUCTION: false,  // 开发时设为 false，发布时设为 true
+  IS_PRODUCTION: true,  // 开发时设为 false，发布时设为 true
   SKIP_REMOTE_CONFIG: true,  // 开发时跳过远程配置，直接使用本地文件
   ENABLE_CONFIG_CACHE: false, // 开发时禁用配置缓存，确保修改立即生效
   FORCE_LOCAL_CONFIG: true   // 开发时强制使用本地配置文件
@@ -524,25 +524,8 @@ if (typeof window === 'undefined') {
   // 动态获取站点配置
   self.getDefaultSites = async function() {
     try {
-      // 开发环境：跳过远程配置，直接使用本地文件
-      if (!DEV_CONFIG.IS_PRODUCTION && DEV_CONFIG.SKIP_REMOTE_CONFIG) {
-        console.log('🚀 开发模式：跳过远程配置，直接加载本地文件');
-        try {
-          const response = await fetch(chrome.runtime.getURL('config/siteHandlers.json'));
-          if (response.ok) {
-            const localConfig = await response.json();
-            if (localConfig.sites && localConfig.sites.length > 0) {
-              console.log('✅ 开发模式：从本地文件加载站点配置成功');
-              return localConfig.sites;
-            }
-          }
-        } catch (error) {
-          console.error('❌ 开发模式：从本地文件加载配置失败:', error);
-        }
-        return [];
-      }
       
-      // 生产环境：从 remoteSiteHandlers 读取基础配置
+      //1 从 remoteSiteHandlers 读取基础配置
       console.log('尝试从 remoteSiteHandlers 读取站点配置...');
       let baseSites = [];
       try {
@@ -550,6 +533,7 @@ if (typeof window === 'undefined') {
         if (result.remoteSiteHandlers && result.remoteSiteHandlers.sites && result.remoteSiteHandlers.sites.length > 0) {
           baseSites = result.remoteSiteHandlers.sites;
           console.log('从 remoteSiteHandlers 加载站点配置成功');
+          console.log('remoteSiteHandlers 加载的站点配置:', baseSites.map(site => ({ name: site.name, enabled: site.enabled })));
         }
       } catch (error) {
         console.error('从 remoteSiteHandlers 读取配置失败:', error);
@@ -561,6 +545,7 @@ if (typeof window === 'undefined') {
         const { sites: userSiteSettings = {} } = await chrome.storage.sync.get('sites');
         userSettings = userSiteSettings;
         console.log('从 chrome.storage.sync 加载用户设置成功');
+        console.log('chrome.storage.sync 加载的用户设置:', Object.keys(userSettings).map(name => ({ name, enabled: userSettings[name]?.enabled })));
       } catch (error) {
         console.error('从 chrome.storage.sync 读取用户设置失败:', error);
       }
@@ -584,6 +569,7 @@ if (typeof window === 'undefined') {
         });
         
         console.log('合并配置成功，站点数量:', mergedSites.length);
+        console.log('合并配置成功，站点配置:', mergedSites.map(site => ({ name: site.name, enabled: site.enabled })));
         return mergedSites;
       }
       
@@ -638,23 +624,6 @@ else {
   // 动态获取站点配置
   window.getDefaultSites = async function() {
     try {
-      // 开发环境：跳过远程配置，直接使用本地文件
-      if (!DEV_CONFIG.IS_PRODUCTION && DEV_CONFIG.SKIP_REMOTE_CONFIG) {
-        console.log('🚀 开发模式：跳过远程配置，直接加载本地文件');
-        try {
-          const response = await fetch(chrome.runtime.getURL('config/siteHandlers.json'));
-          if (response.ok) {
-            const localConfig = await response.json();
-            if (localConfig.sites && localConfig.sites.length > 0) {
-              console.log('✅ 开发模式：从本地文件加载站点配置成功');
-              return localConfig.sites;
-            }
-          }
-        } catch (error) {
-          console.error('❌ 开发模式：从本地文件加载配置失败:', error);
-        }
-        return [];
-      }
       
       // 生产环境：从 remoteSiteHandlers 读取基础配置
       let baseSites = [];

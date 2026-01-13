@@ -1,4 +1,7 @@
 {
+  "shortName": {
+    "message": "AI 比一比"
+  },
   "appName": {
     "message": "AI比一比 - 一键对比 ChatGPT, Gemini, DeepSeek 等多个AI"
   },
@@ -294,5 +297,11 @@
   },
   "devNotice": {
     "message": "功能在开发中，可能会有错误或不足"
+  },
+  "pinGuideTitle": {
+    "message": "将扩展固定到工具栏，方便快速访问"
+  },
+  "pinGuideSteps": {
+    "message": "点击工具栏的拼图图标 → 找到「AI比一比」→ 点击固定图标"
   }
 } 

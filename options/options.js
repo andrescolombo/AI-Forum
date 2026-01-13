@@ -1052,6 +1052,14 @@ function initializeNavigation() {
   });
 }
 
+// 打开历史记录页面
+function openHistoryPage() {
+  chrome.tabs.create({
+    url: chrome.runtime.getURL('history/history.html'),
+    active: true
+  });
+}
+
 // 页面初始化
 document.addEventListener('DOMContentLoaded', () => {
   console.log('Options page loaded');
@@ -1070,4 +1078,13 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // 监听 hash 变化
   window.addEventListener('hashchange', handleHashNavigation);
+  
+  // 绑定历史记录链接点击事件
+  const historyLink = document.getElementById('historyLink');
+  if (historyLink) {
+    historyLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      openHistoryPage();
+    });
+  }
 });

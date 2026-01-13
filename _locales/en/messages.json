@@ -1,4 +1,7 @@
 {
+  "shortName": {
+    "message": "AI Compare"
+  },
   "appName": {
     "message": "AI Compare - OneClick to compare ChatGPT, Gemini, DeepSeek and more."
   },
@@ -299,5 +302,11 @@
   },
   "devNotice": {
     "message": "Feature in development, may have errors or limitations"
+  },
+  "pinGuideTitle": {
+    "message": "Pin the extension for quick access"
+  },
+  "pinGuideSteps": {
+    "message": "Click the puzzle icon in the toolbar → Find \"AI Compare\" → Click the pin icon"
   }
 } 

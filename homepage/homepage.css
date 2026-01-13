@@ -17,6 +17,107 @@ html, body {
     padding: 20px;
 }
 
+/* Pin 引导提示样式 */
+.pin-guide-banner {
+    width: 100%;
+    max-width: 700px;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pin-guide-content {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    gap: 12px;
+    position: relative;
+}
+
+.pin-guide-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.pin-guide-text {
+    flex: 1;
+    color: white;
+}
+
+.pin-guide-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    line-height: 1.4;
+}
+
+.pin-guide-steps {
+    font-size: 13px;
+    opacity: 0.95;
+    line-height: 1.5;
+}
+
+.pin-guide-image {
+    width: 250px;
+    flex-shrink: 0;
+    opacity: 0.9;
+}
+
+.pin-guide-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background-color 0.2s;
+}
+
+.pin-guide-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.pin-guide-close:active {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.extension-icon-container {
+    width: 100%;
+    max-width: 700px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.extension-name {
+    font-size: 24px;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+    padding: 0;
+}
+
 .search-bar {
     width: 100%;
     max-width: 700px;
