@@ -1008,8 +1008,11 @@ async function createIframes(query, sites) {
   nav.appendChild(navList);
   document.body.insertBefore(nav, container);
 
-
-  
+  // 如果有查询词，保存历史记录（只保存 ID 和 query，URL 由各 iframe 内部脚本检测后更新）
+  if (query && query.trim() !== '') {
+    // 立即保存历史记录，不等待 iframe 加载
+    savePKHistory(query);
+  }
 }
 
 
@@ -1091,6 +1094,23 @@ function createSingleIframe(siteName, url, container, query) {
   const messageHandler = (event) => {
     if (event.data.type === 'LINK_CLICK' && event.data.href) {
       window.open(event.data.href, '_blank');
+    }
+    
+    // 处理历史记录 URL 更新消息
+    if (event.data.type === 'HISTORY_URL_UPDATE' && event.data.source === 'inject-script') {
+      // 确保消息来自当前 iframe
+      if (iframe.contentWindow && event.source === iframe.contentWindow) {
+        const siteName = event.data.siteName;
+        const url = event.data.url;
+        const historyId = window._currentHistoryId;
+        
+        if (siteName && url && historyId) {
+          console.log(`📝 收到 ${siteName} 的 URL 更新: ${url}，历史记录 ID: ${historyId}`);
+          updateHistorySiteUrl(siteName, url, historyId);
+        } else {
+          console.warn('历史记录 URL 更新消息缺少必要参数:', { siteName, url, historyId });
+        }
+      }
     }
   };
   
@@ -1564,6 +1584,145 @@ if (settingsIcon && settingsDialog) {
     });
 }
 
+// 历史记录抽屉相关功能
+const historyIcon = document.querySelector('.history-icon');
+const historyDrawer = document.getElementById('historyDrawer');
+const historyDrawerOverlay = document.getElementById('historyDrawerOverlay');
+const historyDrawerCloseBtn = document.getElementById('historyDrawerCloseBtn');
+const historyList = document.getElementById('historyList');
+
+// 打开历史记录抽屉
+async function loadHistoryDrawer() {
+    try {
+        // 从 chrome.storage.local 读取历史记录
+        const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
+        
+        // 渲染历史记录列表
+        renderHistoryList(pkHistory);
+        
+        // 更新底部提示文本
+        await updateHistoryFooter();
+        
+        // 显示抽屉和遮罩层
+        historyDrawer.classList.add('open');
+        historyDrawerOverlay.classList.add('show');
+    } catch (error) {
+        console.error('加载历史记录失败:', error);
+    }
+}
+
+// 更新历史记录抽屉底部提示文本
+async function updateHistoryFooter() {
+    const footer = document.getElementById('historyDrawerFooter');
+    if (!footer) return;
+    
+    let maxHistory = 100; // 默认值
+    try {
+        if (window.AppConfigManager) {
+            const appConfig = await window.AppConfigManager.loadConfig();
+            if (appConfig && appConfig.history && appConfig.history.maxCount) {
+                maxHistory = appConfig.history.maxCount;
+            }
+        }
+    } catch (error) {
+        console.warn('读取历史记录数量配置失败，使用默认值 100:', error);
+    }
+    
+    // 使用国际化文本，支持双语
+    const messageKey = chrome.i18n.getMessage('historyMaxRecordsTip', [maxHistory.toString()]);
+    footer.textContent = messageKey || `只保存最近的${maxHistory}条记录`;
+}
+
+// 渲染历史记录列表
+function renderHistoryList(historyArray) {
+    // 清空历史记录列表容器
+    historyList.innerHTML = '';
+    
+    if (historyArray.length === 0) {
+        historyList.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">暂无搜索历史</div>';
+        return;
+    }
+    
+    // 遍历历史记录数组，为每条记录创建元素
+    historyArray.forEach(historyItem => {
+        const historyItemElement = document.createElement('div');
+        historyItemElement.className = 'history-item';
+        historyItemElement.textContent = historyItem.query || '无查询内容';
+        
+        // 添加点击事件
+        historyItemElement.addEventListener('click', () => {
+            handleHistoryItemClick(historyItem);
+        });
+        
+        historyList.appendChild(historyItemElement);
+    });
+}
+
+// 处理历史记录项点击
+async function handleHistoryItemClick(historyItem) {
+    try {
+        // 先更新搜索框值
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.value = historyItem.query || '';
+        }
+        
+        // 更新 URL 参数（在加载 iframes 之前更新，以便 loadHistoryIframes 可以读取正确的 query）
+        const urlParams = new URLSearchParams(window.location.search);
+        if (historyItem.query) {
+            urlParams.set('query', historyItem.query);
+        } else {
+            urlParams.delete('query');
+        }
+        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+        window.history.replaceState({}, '', newUrl);
+        
+        // 加载历史 iframes
+        await loadHistoryIframes(historyItem.sites);
+        
+        // 关闭抽屉
+        closeHistoryDrawer();
+    } catch (error) {
+        console.error('处理历史记录项点击失败:', error);
+    }
+}
+
+// 关闭历史记录抽屉
+function closeHistoryDrawer() {
+    historyDrawer.classList.remove('open');
+    historyDrawerOverlay.classList.remove('show');
+}
+
+// 历史按钮点击事件
+if (historyIcon) {
+    historyIcon.addEventListener('click', (e) => {
+        e.stopPropagation();
+        loadHistoryDrawer();
+    });
+}
+
+// 遮罩层点击事件
+if (historyDrawerOverlay) {
+    historyDrawerOverlay.addEventListener('click', () => {
+        closeHistoryDrawer();
+    });
+}
+
+// 关闭按钮点击事件
+if (historyDrawerCloseBtn) {
+    historyDrawerCloseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeHistoryDrawer();
+    });
+}
+
+// ESC 键监听
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && historyDrawer.classList.contains('open')) {
+        closeHistoryDrawer();
+    }
+});
+
 // 初始化国际化
 function initializeI18n() {
     // 处理所有带有 data-i18n 属性的元素
@@ -1942,33 +2101,26 @@ async function savePKHistory(query) {
       return; // 如果没有 iframe，不保存
     }
     
-    // 收集所有 iframe 的 URL 和站点名
-    const sites = [];
+    // 收集所有站点的名称（不收集 URL，URL 将由各 iframe 内部脚本检测并保存）
+    const siteNames = [];
     iframes.forEach(iframe => {
-      try {
-        const siteName = iframe.getAttribute('data-site');
-        const currentUrl = iframe.src;
-        
-        if (siteName && currentUrl) {
-          sites.push({
-            name: siteName,
-            url: currentUrl
-          });
-        }
-      } catch (error) {
-        console.error('收集 iframe 信息失败:', error);
+      const siteName = iframe.getAttribute('data-site');
+      if (siteName) {
+        siteNames.push(siteName);
       }
     });
     
-    if (sites.length === 0) {
-      return; // 如果没有有效的站点信息，不保存
+    if (siteNames.length === 0) {
+      return; // 如果没有有效的站点，不保存
     }
     
-    // 创建历史记录项
+    // 创建历史记录项（只保存 ID 和 query，sites 初始为空数组）
+    // 各 iframe 内部的脚本会检测 URL 并更新对应的站点 URL
+    const historyId = Date.now().toString();
     const historyItem = {
-      id: Date.now().toString(),
+      id: historyId,
       query: query.trim(),
-      sites: sites,
+      sites: [], // 初始为空，由各 iframe 内部脚本检测 URL 后更新
       timestamp: Date.now(),
       date: new Date().toLocaleString('zh-CN', {
         year: 'numeric',
@@ -1985,16 +2137,69 @@ async function savePKHistory(query) {
     // 将新记录添加到开头
     const updatedHistory = [historyItem, ...pkHistory];
     
-    // 限制历史记录数量（最多保存100条）
-    const maxHistory = 100;
+    // 限制历史记录数量（从 appConfig.json 读取配置）
+    let maxHistory = 100; // 默认值
+    try {
+      if (window.AppConfigManager) {
+        const appConfig = await window.AppConfigManager.loadConfig();
+        if (appConfig && appConfig.history && appConfig.history.maxCount) {
+          maxHistory = appConfig.history.maxCount;
+        }
+      }
+    } catch (error) {
+      console.warn('读取历史记录数量配置失败，使用默认值 100:', error);
+    }
     const limitedHistory = updatedHistory.slice(0, maxHistory);
     
     // 保存到存储
     await chrome.storage.local.set({ pkHistory: limitedHistory });
     
-    console.log('PK 历史记录已保存:', historyItem);
+    // 将历史记录 ID 存储到全局变量，供 iframe 内部脚本更新 URL 时使用
+    window._currentHistoryId = historyId;
+    
+    console.log('PK 历史记录已创建（待 iframe 更新 URL）:', historyItem);
   } catch (error) {
     console.error('保存 PK 历史记录失败:', error);
+  }
+}
+
+// 更新历史记录中特定站点的 URL
+async function updateHistorySiteUrl(siteName, url, historyId) {
+  try {
+    // 从存储中获取历史记录
+    const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
+    
+    // 查找对应的历史记录
+    const historyIndex = pkHistory.findIndex(item => item.id === historyId);
+    if (historyIndex === -1) {
+      console.warn(`未找到历史记录 ID: ${historyId}`);
+      return;
+    }
+    
+    const historyItem = pkHistory[historyIndex];
+    
+    // 确保 sites 数组存在
+    if (!historyItem.sites) {
+      historyItem.sites = [];
+    }
+    
+    // 查找或创建站点项
+    let siteItem = historyItem.sites.find(s => s.name === siteName);
+    if (siteItem) {
+      // 更新现有站点的 URL
+      siteItem.url = url;
+    } else {
+      // 创建新的站点项
+      siteItem = { name: siteName, url: url };
+      historyItem.sites.push(siteItem);
+    }
+    
+    // 保存更新后的历史记录
+    await chrome.storage.local.set({ pkHistory: pkHistory });
+    
+    console.log(`✅ 更新历史记录 ${historyId} 中 ${siteName} 的 URL:`, url);
+  } catch (error) {
+    console.error('更新历史记录站点 URL 失败:', error);
   }
 }
 

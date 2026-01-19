@@ -17,6 +17,9 @@
     "uninstallSurvey": "https://wenjuan.feishu.cn/m?t=sxcO29Fz913i-1ad4",
     "feedbackSurvey": "https://wenjuan.feishu.cn/m/cfm?t=sTFPGe4oetOi-9m3a"
   },
+  "history": {
+    "maxCount": 100
+  },
   "supportedFileTypes": {
     "description": "文件粘贴功能支持的文件类型配置",
     "categories": {

@@ -1,6 +1,6 @@
 {
-  "version": "1.1.2",
-  "lastUpdated": "2026-01-11T00:00:00Z",
+  "version": "1.1.3",
+  "lastUpdated": "2026-01-19T00:00:00Z",
   "description": "支持粘贴功能",
   "author": "AIShortcuts",
   "sites": [
@@ -82,6 +82,9 @@
           "urlPattern": "chatgpt.com/c/",
           "removeParams": ["locale"]
         }
+      },
+      "historyHandler": {
+        "urlFeature": "/c/"
       }
     },
     {
@@ -164,6 +167,9 @@
           "urlPattern": "gemini.google.com/app/",
           "removeParams": ["locale"]
         }
+      },
+      "historyHandler": {
+        "urlFeature": "/app/"
       }
     },
     {
@@ -267,6 +273,9 @@
           "main",
           "article"
         ]
+      },
+      "historyHandler": {
+        "urlFeature": "/c/"
       }
     },
     {
@@ -389,12 +398,15 @@
           "article"
         ],
         "editModeCheck": "textarea"
+      },
+      "historyHandler": {
+        "urlFeature": "/chat/"
       }
     },
     {
       "name": "AI Studio",
       "url": "https://aistudio.google.com/",
-      "enabled": true,
+      "enabled": false,
       "supportUrlQuery": false,
       "region": "US",
       "hidden": false,
@@ -476,6 +488,9 @@
           ".prose"
         ],
         "editModeCheck": "textarea[formcontrolname=\"promptText\"], textarea.cdk-textarea-autosize"
+      },
+      "historyHandler": {
+        "urlFeature": "/prompts/"
       }
     },
     {
@@ -586,6 +601,9 @@
           ".attachment",
           "[class*=\"attachment\"]"
         ]
+      },
+      "historyHandler": {
+        "urlFeature": "/chat/"
       }
     },
     {
@@ -694,6 +712,9 @@
           "[data-testid*=\"input\"]",
           "[data-testid*=\"send\"]"
         ]
+      },
+      "historyHandler": {
+        "urlFeature": "/chat/"
       }
     },
     {
@@ -789,6 +810,9 @@
             "description": "执行文件粘贴操作"
           }
         ]
+      },
+      "historyHandler": {
+        "urlFeature": "/search-v2/"
       }
     },
     {
@@ -949,7 +973,10 @@
             "action": "sendKeys",
             "selector": "[contenteditable=\"true\"]",
             "keys": "Enter",
-            "description": "发送回车键"
+            "waitForElement": true,
+            "maxAttempts": 5,
+            "retryInterval": 200,
+            "description": "发送回车键（支持重试）"
           }
         ]
       },
@@ -1023,6 +1050,9 @@
           ".attachment",
           "[class*=\"attachment\"]"
         ]
+      },
+      "historyHandler": {
+        "urlFeature": "-"
       }
     },
     {
@@ -1486,9 +1516,10 @@
             "description": "等待100ms"
           },
           {
-            "action": "click",
-            "selector": "button[title=\"Submit message\"]",
-            "description": "点击提交按钮"
+            "action": "sendKeys",
+            "selector": "textarea#userInput",
+            "keys": "Enter",
+            "description": "发送回车键提交"
           }
         ]
       },
@@ -1509,6 +1540,9 @@
             "description": "执行文件粘贴操作"
           }
         ]
+      },
+      "historyHandler": {
+        "urlFeature": "/chats/"
       }
     },
     {
@@ -1584,6 +1618,9 @@
             "description": "执行文件粘贴操作"
           }
         ]
+      },
+      "historyHandler": {
+        "urlFeature": "/chat/"
       }
     },
     {

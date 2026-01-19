@@ -328,6 +328,7 @@ class SiteDetector {
         searchHandler: site.searchHandler,
         fileUploadHandler: site.fileUploadHandler,
         contentExtractor: site.contentExtractor,
+        historyHandler: site.historyHandler,
         supportUrlQuery: site.supportUrlQuery,
         matchType: site.matchType
       };

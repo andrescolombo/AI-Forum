@@ -267,6 +267,17 @@
   "exportResponses": {
     "message": "Export AI Compare Results"
   },
+  "historyTitle": {
+    "message": "History"
+  },
+  "historyMaxRecordsTip": {
+    "message": "Only the latest $COUNT$ records are saved",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "exportModalTitle": {
     "message": "Export AI Compare Results"
   },

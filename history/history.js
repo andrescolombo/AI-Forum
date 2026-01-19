@@ -65,7 +65,7 @@ function createHistoryItem(item) {
     
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete-btn';
-    deleteBtn.textContent = '删除';
+    deleteBtn.textContent = 'Delete';
     deleteBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         if (confirm('确定要删除这条历史记录吗？')) {

@@ -52,6 +52,9 @@ const AppConfigManager = {
         contextMenu: true,
         searchEngine: true
       },
+      history: {
+        maxCount: 100
+      },
       externalLinks: {
         uninstallSurvey: 'https://wenjuan.feishu.cn/m?t=sxcO29Fz913i-1ad4',
         feedbackSurvey: 'https://wenjuan.feishu.cn/m/cfm?t=sTFPGe4oetOi-9m3a'

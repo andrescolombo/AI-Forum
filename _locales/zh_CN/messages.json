@@ -262,6 +262,17 @@
   "exportResponses": {
     "message": "导出AI比一比结果"
   },
+  "historyTitle": {
+    "message": "历史记录"
+  },
+  "historyMaxRecordsTip": {
+    "message": "只保存最近的$COUNT$条记录",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "exportModalTitle": {
     "message": "导出AI比一比结果"
   },

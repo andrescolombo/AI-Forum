@@ -356,10 +356,71 @@ async function loadRemoteConfig() {
     }
 }
 
+// 加载历史记录
+async function loadHistory() {
+    const statusEl = document.getElementById('history-status');
+    const contentEl = document.getElementById('history-content');
+    
+    try {
+        console.log('开始加载历史记录...');
+        statusEl.innerHTML = '<div class="loading-spinner"></div> 正在加载...';
+        statusEl.className = 'status loading';
+
+        if (!chrome?.storage?.local) {
+            throw new Error('Chrome Storage Local API 不可用');
+        }
+
+        const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
+        console.log('历史记录数据:', pkHistory);
+
+        statusEl.textContent = '✅ 加载成功';
+        statusEl.className = 'status success';
+        
+        contentEl.textContent = formatJSON(pkHistory);
+        
+        // 计算统计信息
+        const stats = {};
+        if (pkHistory.length > 0) {
+            stats.总数 = pkHistory.length;
+            const latestDate = new Date(pkHistory[0].timestamp);
+            const oldestDate = new Date(pkHistory[pkHistory.length - 1].timestamp);
+            stats.最新记录 = latestDate.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            stats.最旧记录 = oldestDate.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } else {
+            stats.总数 = 0;
+        }
+        renderStats(stats, 'history-stats');
+
+        console.log('历史记录加载完成');
+
+    } catch (error) {
+        console.error('加载历史记录失败:', error);
+        statusEl.textContent = `❌ 加载失败: ${error.message}`;
+        statusEl.className = 'status error';
+        contentEl.innerHTML = `<div class="error-message">
+            错误详情: ${error.message}<br>
+            错误堆栈: ${error.stack?.slice(0, 200)}...
+        </div>`;
+    }
+}
+
 // 刷新全部
 async function refreshAll() {
     console.log('开始刷新全部数据...');
     await Promise.all([
+        loadHistory(),
         loadLocalStorage(),
         loadSyncStorage(),
         loadLocalConfig(),
@@ -529,6 +590,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
                 case 'loadMergedSites':
                     loadMergedSites();
+                    break;
+                case 'loadHistory':
+                    loadHistory();
                     break;
             }
         }
