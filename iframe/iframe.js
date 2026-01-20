@@ -337,6 +337,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // 添加导出回答功能的事件监听器
     initializeExportResponses();
+    
+    // 检查 URL 参数，如果 upload=true，显示提示信息
+    // 注意：urlParams 已经在上面第 169 行声明了，这里直接使用
+    if (urlParams.get('upload') === 'true') {
+        // 立即显示提示，停留时间更长
+        showToast('页面加载后，点击输入框的🔗图标', 8000); // 显示 8 秒
+    }
 
 });
 

@@ -186,35 +186,47 @@
           {
             "action": "focus",
             "selector": "div[contenteditable=\"true\"].tiptap",
+            "maxAttempts": 5,
+            "retryInterval": 200,
             "description": "聚焦输入框"
           },
           {
             "action": "setValue",
             "selector": "div[contenteditable=\"true\"].tiptap",
             "inputType": "contenteditable",
+            "maxAttempts": 5,
+            "retryInterval": 200,
             "description": "设置输入框的值"
           },
           {
             "action": "triggerEvents",
             "selector": "div[contenteditable=\"true\"].tiptap",
             "events": ["input"],
+            "maxAttempts": 5,
+            "retryInterval": 200,
             "description": "触发输入事件"
           },
           {
             "action": "triggerEvents",
             "selector": "div[contenteditable=\"true\"].tiptap",
             "events": ["input", "change", "blur", "focus"],
+            "maxAttempts": 5,
+            "retryInterval": 200,
             "description": "触发完整的输入事件序列"
           },
           {
             "action": "wait",
             "duration": 100,
+            "maxAttempts": 5,
+            "retryInterval": 200,
             "description": "等待100ms"
           },
           {
             "action": "sendKeys",
             "selector": "div[contenteditable=\"true\"].tiptap",
             "keys": "Enter",
+            "maxAttempts": 5,
+            "retryInterval": 200,
             "description": "发送回车键"
           }
         ]
@@ -298,7 +310,7 @@
             "action": "focus",
             "selector": "[contenteditable=\"true\"]",
             "waitForElement": true,
-            "maxAttempts": 5,
+            "maxAttempts": 10,
             "retryInterval": 200,
             "description": "聚焦可编辑区域（支持重试）"
           },
@@ -950,18 +962,24 @@
           {
             "action": "focus",
             "selector": "[contenteditable=\"true\"]",
+            "maxAttempts": 5,
+            "retryInterval": 200,
             "description": "聚焦可编辑区域"
           },
           {
             "action": "setValue",
             "selector": "[contenteditable=\"true\"]",
             "inputType": "contenteditable",
+            "maxAttempts": 5,
+            "retryInterval": 200,
             "description": "设置可编辑区域内容"
           },
           {
             "action": "triggerEvents",
             "selector": "[contenteditable=\"true\"]",
             "events": ["input", "change", "blur", "focus"],
+            "maxAttempts": 5,
+            "retryInterval": 200,
             "description": "触发输入事件"
           },
           {
@@ -1284,12 +1302,12 @@
     
     {
       "name": "通义千问",
-      "url": "https://tongyi.com/",
+      "url": "https://www.qianwen.com/",
       "enabled": false,
       "supportUrlQuery": false,
       "region": "China",
-      "hidden": true,
-      "supportIframe": false,
+      "hidden": false,
+      "supportIframe": true,
       "note": "",
       "searchHandler": {
         "steps": [
@@ -1400,6 +1418,9 @@
           ".attachment",
           "[class*=\"attachment\"]"
         ]
+      },
+      "historyHandler": {
+        "urlFeature": "/chat/"
       }
     },
     {
@@ -1551,7 +1572,7 @@
       "enabled": true,
       "supportUrlQuery": true,
       "region": "US",
-      "hidden": false,
+      "hidden": true,
       "supportIframe": false,
       "note": "iframe页面下，打不开网页了，暂时无法使用",
       "searchHandler": {

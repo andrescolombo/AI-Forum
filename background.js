@@ -710,6 +710,18 @@ self.addEventListener('error', (error) => {
     console.error('Service Worker 错误:', error);
 });
 
+// 捕获未处理的 Promise rejection
+self.addEventListener('unhandledrejection', (event) => {
+    // 忽略 "No SW" 错误，这是 Chrome 扩展的正常行为
+    if (event.reason && event.reason.message && event.reason.message.includes('No SW')) {
+        // 静默处理，不输出错误
+        event.preventDefault();
+        return;
+    }
+    console.error('未处理的 Promise rejection:', event.reason);
+    event.preventDefault(); // 防止错误显示在控制台
+});
+
 
 // 防抖变量，避免短时间内多次调用
 let contextMenuTimeout = null;

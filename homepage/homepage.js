@@ -381,6 +381,32 @@ async function initializeSitesList() {
     }
 }
 
+// 添加上传附件按钮点击事件
+document.getElementById('fileUploadButton').addEventListener('click', () => {
+    // 打开 iframe.html 页面，并传递 upload=true 参数来触发文件上传
+    const urlParams = new URLSearchParams();
+    urlParams.set('upload', 'true');
+    
+    // 获取选中的站点列表
+    const selectedSites = getSelectedSites();
+    if (selectedSites.length > 0) {
+        urlParams.set('sites', selectedSites.join(','));
+    }
+    
+    // 检查当前页面是否在侧边栏中
+    const currentUrlParams = new URLSearchParams(window.location.search);
+    const isSidePanel = currentUrlParams.get('side_panel') === 'true';
+    if (isSidePanel) {
+        urlParams.set('side_panel', 'true');
+    }
+    
+    // 构建 URL
+    const iframeUrl = chrome.runtime.getURL(`iframe/iframe.html?${urlParams.toString()}`);
+    
+    // 在当前页面跳转，而不是打开新标签页
+    window.location.href = iframeUrl;
+});
+
 // 添加搜索按钮点击事件
 document.getElementById('searchButton').addEventListener('click', () => {
     const query = document.getElementById('searchInput').value.trim();

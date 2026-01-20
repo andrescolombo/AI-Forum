@@ -1,6 +1,7 @@
 
 // 避免重复声明的检查
-if (typeof window !== 'undefined' && window.BaseConfigLoaded) {
+if ((typeof window !== 'undefined' && window.BaseConfigLoaded) || 
+    (typeof self !== 'undefined' && self.BaseConfigLoaded)) {
   console.log('baseConfig.js 已经加载，跳过重复声明');
 } else {
 
@@ -714,7 +715,11 @@ else {
   };
   
   // 标记配置已加载，避免重复声明
-  window.BaseConfigLoaded = true;
+  if (typeof window !== 'undefined') {
+    window.BaseConfigLoaded = true;
+  } else if (typeof self !== 'undefined') {
+    self.BaseConfigLoaded = true;
+  }
 }
 
 } // 结束重复声明检查的 else 块
