@@ -3,10 +3,10 @@
     "message": "AI Compare"
   },
   "appName": {
-    "message": "AI Compare - OneClick to compare ChatGPT, Gemini, DeepSeek and more."
+    "message": "AI Compare - OneClick to compare ChatGPT, Gemini, Grok and more."
   },
   "extDescription": {
-    "message": "AI Compare - Compare responses from ChatGPT, Claude, Gemini, DeepSeek and more in one click. Find the best solution quickly."
+    "message": "AI Compare helps you find the best answer from multiple AI quickly."
   },
   "configTitle": {
     "message": " AI Sites"
@@ -319,5 +319,11 @@
   },
   "pinGuideSteps": {
     "message": "Click the puzzle icon in the toolbar → Find \"AI Compare\" → Click the pin icon"
+  },
+  "fiveStarRating": {
+    "message": "5-Star Rating"
+  },
+  "userFeedback": {
+    "message": "User Feedback"
   }
 } 

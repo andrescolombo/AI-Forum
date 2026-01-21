@@ -3,10 +3,10 @@
     "message": "AI 比一比"
   },
   "appName": {
-    "message": "AI比一比 - 一键对比 ChatGPT, Gemini, DeepSeek 等多个AI"
+    "message": "AI比一比 - 一键对比 ChatGPT, Gemini, Grok 等多个AI"
   },
   "extDescription": {
-    "message": "AI比一比 - 一键对比 ChatGPT, Claude, Gemini, DeepSeek 等多个AI的回答，快速找到最佳解决方案。"
+    "message": "帮你从十多个AI中快速找到最佳答案。"
   },
   "configTitle": {
     "message": "AI站点设置"
@@ -314,5 +314,11 @@
   },
   "pinGuideSteps": {
     "message": "点击工具栏的拼图图标 → 找到「AI比一比」→ 点击固定图标"
+  },
+  "fiveStarRating": {
+    "message": "五星好评"
+  },
+  "userFeedback": {
+    "message": "用户反馈"
   }
 } 

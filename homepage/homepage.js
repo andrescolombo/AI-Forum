@@ -98,6 +98,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // 初始化站点列表
     await initializeSitesList();
+    
+    // 初始化操作链接
+    initializeActionLinks();
 });
 
 // 初始化国际化
@@ -435,6 +438,60 @@ document.getElementById('searchInput').addEventListener('keydown', (e) => {
         handleQuery(query);
     }
 });
+
+// 初始化操作链接
+async function initializeActionLinks() {
+    try {
+        // 加载配置
+        const config = await AppConfigManager.loadConfig();
+        const externalLinks = config.externalLinks || {};
+        
+        // 五星好评链接
+        const rateLink = document.getElementById('rateLink');
+        if (rateLink) {
+            rateLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                // 从配置中获取评论链接
+                const reviewUrl = externalLinks.reviewLink || 
+                    `https://chrome.google.com/webstore/detail/${chrome.runtime.id}/reviews`;
+                chrome.tabs.create({ url: reviewUrl });
+            });
+        }
+        
+        // 用户反馈链接
+        const feedbackLink = document.getElementById('feedbackLink');
+        if (feedbackLink) {
+            feedbackLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                // 从配置中获取反馈链接
+                const feedbackUrl = externalLinks.feedbackSurvey || 
+                    'https://wenjuan.feishu.cn/m/cfm?t=sTFPGe4oetOi-9m3a';
+                chrome.tabs.create({ url: feedbackUrl });
+            });
+        }
+    } catch (error) {
+        console.error('加载配置失败:', error);
+        // 如果配置加载失败，使用默认链接
+        const rateLink = document.getElementById('rateLink');
+        if (rateLink) {
+            rateLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                const defaultReviewUrl = `https://chrome.google.com/webstore/detail/${chrome.runtime.id}/reviews`;
+                chrome.tabs.create({ url: defaultReviewUrl });
+            });
+        }
+        
+        const feedbackLink = document.getElementById('feedbackLink');
+        if (feedbackLink) {
+            feedbackLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                chrome.tabs.create({ 
+                    url: 'https://wenjuan.feishu.cn/m/cfm?t=sTFPGe4oetOi-9m3a' 
+                });
+            });
+        }
+    }
+}
 
 // Toast 提示函数
 function showToast(message, duration = 2000) {
