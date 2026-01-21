@@ -4,6 +4,19 @@ let filePasteHandlerAdded = false;
 // 跟踪输入法组合输入状态（用于中文输入法）
 let isComposing = false;
 
+function trackEvent(name, params = {}) {
+  const analytics = window.AIShortcutsAnalytics;
+  if (analytics && typeof analytics.logEvent === 'function') {
+    analytics.logEvent(name, params);
+  }
+}
+
+function getOpenedSites() {
+  return Array.from(document.querySelectorAll('.ai-iframe'))
+    .map(iframe => iframe.getAttribute('data-site'))
+    .filter(Boolean);
+}
+
 // 统一的文件扩展名检测
 const SUPPORTED_FILE_EXTENSIONS = [
   // Office文档类型
@@ -1334,6 +1347,13 @@ async function getIframeHandler(iframeUrl) {
 document.getElementById('searchButton').addEventListener('click', () => {
   const query = document.getElementById('searchInput').value.trim();
   if (query) {
+    const openedSites = getOpenedSites();
+    trackEvent('iframe_search_submit', {
+      query_length: query.length,
+      selected_sites_count: openedSites.length,
+      selected_sites: openedSites,
+      trigger: 'button'
+    });
     shanshuo();
     iframeFresh(query);
   }
@@ -1362,6 +1382,13 @@ document.getElementById('searchInput').addEventListener('keydown', (e) => {
         e.preventDefault();
         const query = document.getElementById('searchInput').value.trim();
         if (query) {
+            const openedSites = getOpenedSites();
+            trackEvent('iframe_search_submit', {
+                query_length: query.length,
+                selected_sites_count: openedSites.length,
+                selected_sites: openedSites,
+                trigger: 'enter'
+            });
             shanshuo();
             iframeFresh(query);
         }
@@ -1445,6 +1472,10 @@ async function initializeSiteSettings() {
                console.log("用户点击新建iframe", site.name, site.url);
 
                 if (e.target.checked) {
+                    trackEvent('iframe_site_toggle', {
+                        site_name: site.name,
+                        enabled: true
+                    });
                     const container = document.getElementById('iframes-container');
                     if (!container) {
                       console.error('未找到 iframes 容器');
@@ -1481,6 +1512,10 @@ async function initializeSiteSettings() {
                     }
 
                 } else {
+                    trackEvent('iframe_site_toggle', {
+                        site_name: site.name,
+                        enabled: false
+                    });
                     const iframeToRemove = document.querySelector(`[data-site="${site.name}"]`);
                     if (iframeToRemove) {
                         iframeToRemove.closest('.iframe-container').remove();
@@ -3042,6 +3077,9 @@ function initializeFileUpload() {
   
   // 点击上传按钮触发文件选择
   fileUploadButton.addEventListener('click', () => {
+    trackEvent('iframe_upload_click', {
+      trigger: 'button'
+    });
     fileInput.click();
   });
   
@@ -3063,6 +3101,9 @@ function initializeExportResponses() {
   // 点击导出按钮显示导出模态框
   exportButton.addEventListener('click', () => {
     console.log('🎯 导出按钮被点击');
+    trackEvent('iframe_export_click', {
+      trigger: 'button'
+    });
     showExportModal();
   });
   

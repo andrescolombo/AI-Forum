@@ -1,6 +1,13 @@
 // 跟踪输入法组合输入状态（用于中文输入法）
 let isComposing = false;
 
+function trackEvent(name, params = {}) {
+    const analytics = window.AIShortcutsAnalytics;
+    if (analytics && typeof analytics.logEvent === 'function') {
+        analytics.logEvent(name, params);
+    }
+}
+
 // 页面加载完成后的初始化
 document.addEventListener('DOMContentLoaded', async function() {
     // 初始化自动调整高度的输入框
@@ -301,6 +308,14 @@ function handleQuery(query) {
     if (isSidePanel) {
         params.set('side_panel', 'true');
     }
+
+    trackEvent('homepage_search_submit', {
+        query_length: processedQuery.length,
+        selected_sites_count: selectedSites.length,
+        selected_sites: selectedSites,
+        side_panel: isSidePanel,
+        has_query: Boolean(processedQuery)
+    });
     
     // 构建 URL（使用相对路径，在当前页面跳转）
     let searchUrl = chrome.runtime.getURL('iframe/iframe.html');
@@ -357,6 +372,13 @@ async function initializeSitesList() {
             if (site.name === 'ChatGPT') {
                 console.log('ChatGPT enabled 值:', site.enabled, '类型:', typeof site.enabled, '严格等于true:', site.enabled === true, 'checkbox.checked:', checkbox.checked);
             }
+
+            checkbox.addEventListener('change', () => {
+                trackEvent('homepage_site_toggle', {
+                    site_name: site.name,
+                    enabled: checkbox.checked
+                });
+            });
             
             const nameLabel = document.createElement('label');
             nameLabel.textContent = site.name;
@@ -402,6 +424,11 @@ document.getElementById('fileUploadButton').addEventListener('click', () => {
     if (isSidePanel) {
         urlParams.set('side_panel', 'true');
     }
+
+    trackEvent('homepage_upload_click', {
+        selected_sites_count: selectedSites.length,
+        side_panel: isSidePanel
+    });
     
     // 构建 URL
     const iframeUrl = chrome.runtime.getURL(`iframe/iframe.html?${urlParams.toString()}`);
@@ -454,6 +481,9 @@ async function initializeActionLinks() {
                 // 从配置中获取评论链接
                 const reviewUrl = externalLinks.reviewLink || 
                     `https://chrome.google.com/webstore/detail/${chrome.runtime.id}/reviews`;
+                trackEvent('homepage_review_click', {
+                    has_review_link: Boolean(externalLinks.reviewLink)
+                });
                 chrome.tabs.create({ url: reviewUrl });
             });
         }
@@ -466,6 +496,9 @@ async function initializeActionLinks() {
                 // 从配置中获取反馈链接
                 const feedbackUrl = externalLinks.feedbackSurvey || 
                     'https://wenjuan.feishu.cn/m/cfm?t=sTFPGe4oetOi-9m3a';
+                trackEvent('homepage_feedback_click', {
+                    has_feedback_link: Boolean(externalLinks.feedbackSurvey)
+                });
                 chrome.tabs.create({ url: feedbackUrl });
             });
         }

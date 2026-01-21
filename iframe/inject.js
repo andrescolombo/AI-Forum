@@ -528,33 +528,216 @@ async function executeSetValue(step, query) {
   element = await trySetValue();
 
   if (step.inputType === 'contenteditable') {
-    // 处理 contenteditable 元素（支持 Tiptap/ProseMirror 等编辑器）
-    // 查找所有 p 元素，清空并替换为新内容
-    const pElements = element.querySelectorAll('p');
+    // 检查是否是 Lexical 编辑器（通过 data-lexical-editor 属性）
+    const isLexicalEditor = element.hasAttribute('data-lexical-editor') || 
+                           element.getAttribute('data-lexical-editor') === 'true';
     
-    if (pElements.length > 0) {
-      // 如果存在 p 元素，清空所有并只保留第一个
-      if (pElements.length > 1) {
-        // 如果有多个 p 元素，删除多余的
-        for (let i = 1; i < pElements.length; i++) {
-          pElements[i].remove();
+    if (isLexicalEditor) {
+      // 处理 Lexical 编辑器：尝试多种方法更新内容
+      console.log('检测到 Lexical 编辑器，尝试更新内容');
+      
+      // 方法1: 尝试通过 Lexical 的内部 API 更新
+      let updatedViaAPI = false;
+      try {
+        // Lexical 编辑器通常会在元素上存储编辑器实例
+        const editorKey = Object.keys(element).find(key => 
+          key.includes('__lexical') || key.includes('lexical') || key.includes('editor')
+        );
+        
+        if (editorKey && element[editorKey]) {
+          const editor = element[editorKey];
+          if (editor.update && typeof editor.update === 'function') {
+            editor.update(() => {
+              const root = editor.getRootElement();
+              if (root) {
+                root.innerHTML = '';
+                const p = document.createElement('p');
+                const span = document.createElement('span');
+                span.setAttribute('data-lexical-text', 'true');
+                span.textContent = query;
+                p.appendChild(span);
+                root.appendChild(p);
+              }
+            });
+            updatedViaAPI = true;
+            console.log('通过 Lexical API 更新内容');
+          }
         }
+      } catch (apiError) {
+        console.log('Lexical API 方法失败，尝试其他方法:', apiError);
       }
-      const pElement = pElements[0];
-      // 移除空状态类（如 is-empty, is-editor-empty）
-      pElement.classList.remove('is-empty', 'is-editor-empty');
-      // 设置文本内容
-      pElement.innerText = query;
-      // 如果没有内容，保留空 p 元素，但移除占位符类
-      if (!query.trim()) {
-        pElement.innerHTML = '';
+      
+      // 方法2: 如果 API 方法失败，使用 DOM 操作 + 事件触发
+      if (!updatedViaAPI) {
+        // 先聚焦元素
+        element.focus();
+        
+        // 清空现有内容
+        const pElements = element.querySelectorAll('p');
+        if (pElements.length > 0) {
+          if (pElements.length > 1) {
+            for (let i = 1; i < pElements.length; i++) {
+              pElements[i].remove();
+            }
+          }
+          const pElement = pElements[0];
+          
+          // 清空并创建新内容
+          if (query.trim()) {
+            pElement.innerHTML = '';
+            const span = document.createElement('span');
+            span.setAttribute('data-lexical-text', 'true');
+            span.textContent = query;
+            pElement.appendChild(span);
+          } else {
+            pElement.innerHTML = '';
+          }
+        } else {
+          // 如果没有 p 元素，创建完整的 Lexical 结构
+          element.innerHTML = '';
+          const pElement = document.createElement('p');
+          if (query.trim()) {
+            const span = document.createElement('span');
+            span.setAttribute('data-lexical-text', 'true');
+            span.textContent = query;
+            pElement.appendChild(span);
+          }
+          element.appendChild(pElement);
+        }
+        
+        // 触发多种事件让 Lexical 识别变化
+        // 1. 触发 input 事件
+        const inputEvent = new InputEvent('input', {
+          bubbles: true,
+          cancelable: true,
+          inputType: 'insertText',
+          data: query
+        });
+        element.dispatchEvent(inputEvent);
+        
+        // 2. 触发 beforeinput 事件（Lexical 可能监听此事件）
+        const beforeInputEvent = new InputEvent('beforeinput', {
+          bubbles: true,
+          cancelable: true,
+          inputType: 'insertText',
+          data: query
+        });
+        element.dispatchEvent(beforeInputEvent);
+        
+        // 3. 触发 compositionstart, compositionupdate, compositionend（模拟输入法输入）
+        element.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+        element.dispatchEvent(new CompositionEvent('compositionupdate', { 
+          bubbles: true, 
+          data: query 
+        }));
+        element.dispatchEvent(new CompositionEvent('compositionend', { 
+          bubbles: true, 
+          data: query 
+        }));
+        
+        // 4. 触发 change 事件
+        const changeEvent = new Event('change', {
+          bubbles: true,
+          cancelable: true
+        });
+        element.dispatchEvent(changeEvent);
+        
+        // 5. 尝试使用 execCommand（如果浏览器支持）
+        let execCommandSuccess = false;
+        try {
+          // 选中所有内容
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          
+          // 使用 insertText 命令
+          if (document.execCommand('insertText', false, query)) {
+            console.log('使用 execCommand 插入文本成功');
+            execCommandSuccess = true;
+          }
+        } catch (execError) {
+          console.log('execCommand 方法失败:', execError);
+        }
+        
+        // 6. 如果 execCommand 失败，尝试通过 DataTransfer 模拟粘贴（作为最后手段）
+        if (!execCommandSuccess && query.trim()) {
+          try {
+            // 先聚焦并选中所有内容
+            element.focus();
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            // 创建 DataTransfer 对象模拟粘贴
+            const dataTransfer = new DataTransfer();
+            dataTransfer.setData('text/plain', query);
+            
+            // 触发 paste 事件
+            const pasteEvent = new ClipboardEvent('paste', {
+              clipboardData: dataTransfer,
+              bubbles: true,
+              cancelable: true
+            });
+            
+            // 先触发 beforeinput
+            const beforeInputEvent = new InputEvent('beforeinput', {
+              bubbles: true,
+              cancelable: true,
+              inputType: 'insertFromPaste',
+              data: query
+            });
+            element.dispatchEvent(beforeInputEvent);
+            
+            // 触发 paste 事件
+            const pasteHandled = element.dispatchEvent(pasteEvent);
+            
+            if (pasteHandled) {
+              console.log('通过模拟粘贴事件完成');
+            } else {
+              // 如果 paste 事件被阻止，尝试直接使用 insertText
+              document.execCommand('insertText', false, query);
+              console.log('通过 insertText 命令完成');
+            }
+          } catch (fallbackError) {
+            console.log('备用方法失败:', fallbackError);
+          }
+        }
+        
+        console.log('Lexical 编辑器内容已设置（通过 DOM + 事件）');
       }
     } else {
-      // 如果没有 p 元素，创建一个新的
-      element.innerHTML = '<p></p>';
-      const newP = element.querySelector('p');
-      if (newP) {
-        newP.innerText = query;
+      // 处理普通 contenteditable 元素（支持 Tiptap/ProseMirror 等编辑器）
+      // 查找所有 p 元素，清空并替换为新内容
+      const pElements = element.querySelectorAll('p');
+      
+      if (pElements.length > 0) {
+        // 如果存在 p 元素，清空所有并只保留第一个
+        if (pElements.length > 1) {
+          // 如果有多个 p 元素，删除多余的
+          for (let i = 1; i < pElements.length; i++) {
+            pElements[i].remove();
+          }
+        }
+        const pElement = pElements[0];
+        // 移除空状态类（如 is-empty, is-editor-empty）
+        pElement.classList.remove('is-empty', 'is-editor-empty');
+        // 设置文本内容
+        pElement.innerText = query;
+        // 如果没有内容，保留空 p 元素，但移除占位符类
+        if (!query.trim()) {
+          pElement.innerHTML = '';
+        }
+      } else {
+        // 如果没有 p 元素，创建一个新的
+        element.innerHTML = '<p></p>';
+        const newP = element.querySelector('p');
+        if (newP) {
+          newP.innerText = query;
+        }
       }
     }
   } else if (step.inputType === 'special') {

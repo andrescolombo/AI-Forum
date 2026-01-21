@@ -1188,31 +1188,40 @@
     },
     {
       "name": "Kimi",
-      "url": "https://kimi.moonshot.cn/",
+      "url": "https://kimi.com/",
       "enabled": false,
       "supportUrlQuery": false,
       "region": "China",
-      "hidden": true,
-      "supportIframe": false,
+      "hidden": false,
+      "supportIframe": true,
       "note": "待后续支持",
       "searchHandler": {
         "steps": [
           {
             "action": "focus",
-            "selector": "[contenteditable=\"true\"]",
-            "description": "聚焦可编辑区域"
+            "selector": "div.chat-input-editor[contenteditable=\"true\"], [data-lexical-editor=\"true\"][contenteditable=\"true\"]",
+            "waitForElement": true,
+            "maxAttempts": 5,
+            "retryInterval": 200,
+            "description": "聚焦 Lexical 编辑器输入框（支持重试）"
           },
           {
             "action": "setValue",
-            "selector": "[contenteditable=\"true\"]",
+            "selector": "div.chat-input-editor[contenteditable=\"true\"], [data-lexical-editor=\"true\"][contenteditable=\"true\"]",
             "inputType": "contenteditable",
-            "description": "设置可编辑区域内容"
+            "waitForElement": true,
+            "maxAttempts": 5,
+            "retryInterval": 200,
+            "description": "设置 Lexical 编辑器内容（自动创建 span[data-lexical-text] 结构）"
           },
           {
             "action": "triggerEvents",
-            "selector": "[contenteditable=\"true\"]",
-            "events": ["input", "change", "blur", "focus"],
-            "description": "触发输入事件"
+            "selector": "div.chat-input-editor[contenteditable=\"true\"], [data-lexical-editor=\"true\"][contenteditable=\"true\"]",
+            "events": ["input", "change"],
+            "waitForElement": true,
+            "maxAttempts": 5,
+            "retryInterval": 200,
+            "description": "触发输入事件（支持重试）"
           },
           {
             "action": "wait",
@@ -1221,9 +1230,12 @@
           },
           {
             "action": "sendKeys",
-            "selector": "[contenteditable=\"true\"]",
+            "selector": "div.chat-input-editor[contenteditable=\"true\"], [data-lexical-editor=\"true\"][contenteditable=\"true\"]",
             "keys": "Enter",
-            "description": "发送回车键"
+            "waitForElement": true,
+            "maxAttempts": 5,
+            "retryInterval": 200,
+            "description": "发送回车键提交（支持重试）"
           }
         ]
       },
@@ -1231,8 +1243,11 @@
         "steps": [
           {
             "action": "focus",
-            "selector": "[contenteditable=\"true\"]",
-            "description": "聚焦Kimi输入框准备文件粘贴"
+            "selector": "div.chat-input-editor[contenteditable=\"true\"], [data-lexical-editor=\"true\"][contenteditable=\"true\"]",
+            "waitForElement": true,
+            "maxAttempts": 5,
+            "retryInterval": 200,
+            "description": "聚焦Kimi Lexical编辑器输入框准备文件粘贴（支持重试）"
           },
           {
             "action": "wait",
@@ -1297,11 +1312,14 @@
           ".attachment",
           "[class*=\"attachment\"]"
         ]
+      },
+      "historyHandler": {
+        "urlFeature": "/chat/"
       }
     },
     
     {
-      "name": "通义千问",
+      "name": "千问",
       "url": "https://www.qianwen.com/",
       "enabled": false,
       "supportUrlQuery": false,
@@ -1386,6 +1404,127 @@
           "[class*=\"chat-message\"]",
           ".qwen-response",
           "[class*=\"qwen\"]",
+          ".alibaba-response",
+          "[class*=\"alibaba\"]"
+        ],
+        "fallbackSelectors": [
+          "main",
+          "article",
+          ".container",
+          "[class*=\"content\"]",
+          "[class*=\"result\"]",
+          "[class*=\"output\"]"
+        ],
+        "excludeSelectors": [
+          "nav",
+          "header",
+          "footer",
+          ".sidebar",
+          ".menu",
+          ".input",
+          ".prompt",
+          "[class*=\"input\"]",
+          "[class*=\"prompt\"]",
+          "[class*=\"user\"]",
+          "[class*=\"question\"]",
+          ".copy-button",
+          "[class*=\"copy\"]",
+          ".regenerate-button",
+          "[class*=\"regenerate\"]",
+          ".stop-button",
+          "[class*=\"stop\"]",
+          ".attachment",
+          "[class*=\"attachment\"]"
+        ]
+      },
+      "historyHandler": {
+        "urlFeature": "/chat/"
+      }
+    },
+    {
+      "name": "Qwen",
+      "url": "https://chat.qwen.ai/",
+      "enabled": false,
+      "supportUrlQuery": false,
+      "region": "China",
+      "hidden": false,
+      "supportIframe": true,
+      "note": "",
+      "searchHandler": {
+        "steps": [
+          {
+            "action": "focus",
+            "selector": "textarea",
+            "description": "聚焦输入框"
+          },
+          {
+            "action": "setValue",
+            "selector": "textarea",
+            "description": "设置输入框的值"
+          },
+          {
+            "action": "triggerEvents",
+            "selector": "textarea",
+            "events": ["input", "change", "blur", "focus"],
+            "description": "触发输入事件"
+          },
+          {
+            "action": "wait",
+            "duration": 100,
+            "description": "等待100ms"
+          },
+          {
+            "action": "sendKeys",
+            "selector": "textarea",
+            "keys": "Enter",
+            "description": "发送回车键"
+          },
+          {
+            "action": "custom",
+            "customAction": "send_message",
+            "messageType": "qwen",
+            "description": "发送消息给父窗口"
+          }
+        ]
+      },
+      "fileUploadHandler": {
+        "steps": [
+          {
+            "action": "focus",
+            "selector": "textarea",
+            "description": "聚焦Qwen输入框准备文件粘贴"
+          },
+          {
+            "action": "wait",
+            "duration": 200,
+            "description": "等待200ms确保聚焦完成"
+          },
+          {
+            "action": "paste",
+            "description": "执行文件粘贴操作"
+          }
+        ]
+      },
+      "contentExtractor": {
+        "selectors": [
+          "[data-message-author-role=\"assistant\"] .markdown",
+          "[data-message-author-role=\"assistant\"]",
+          ".qwen-message .markdown",
+          ".qwen-message",
+          ".message-content .markdown",
+          ".message-content",
+          "[class*=\"qwen\"][class*=\"message\"]",
+          "[class*=\"qwen\"]",
+          "[class*=\"message\"]",
+          "[class*=\"response\"]",
+          "[class*=\"conversation\"]",
+          "[class*=\"chat\"]",
+          ".qwen-response",
+          "[class*=\"qwen-response\"]",
+          ".ai-response",
+          "[class*=\"ai-response\"]",
+          ".chat-message",
+          "[class*=\"chat-message\"]",
           ".alibaba-response",
           "[class*=\"alibaba\"]"
         ],
