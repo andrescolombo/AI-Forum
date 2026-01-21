@@ -1,6 +1,12 @@
 
 console.log('🎯 inject.js 脚本已加载');
 
+// 每个 iframe（每个注入实例）独立保存本次 PK 的历史上下文
+let __aiCompareHistoryContext = {
+  historyId: null,
+  siteName: null
+};
+
 // 动态检查是否在 AI 站点中运行
 async function isAISite() {
   try {
@@ -1204,13 +1210,21 @@ window.addEventListener('message', async function(event) {
     }
     
     // 只处理 AIShortcuts 扩展的特定消息类型
-    const validMultiAITypes = ['TRIGGER_PASTE', 'search', 'EXTRACT_CONTENT'];
+    const validMultiAITypes = ['TRIGGER_PASTE', 'search', 'EXTRACT_CONTENT', 'SET_HISTORY_CONTEXT'];
     
     if (!validMultiAITypes.includes(event.data.type)) {
         return;
     }
     
     console.log('收到消息类型:', event.data.type);
+
+    // 接收父页面下发的历史上下文（用于把 URL 更新写回正确的 history 记录）
+    if (event.data.type === 'SET_HISTORY_CONTEXT') {
+        __aiCompareHistoryContext.historyId = event.data.historyId || null;
+        __aiCompareHistoryContext.siteName = event.data.siteName || __aiCompareHistoryContext.siteName;
+        console.log('✅ 已更新历史上下文:', __aiCompareHistoryContext);
+        return;
+    }
     
     // 处理文件粘贴消息 - 优先使用站点特定处理器
     if (event.data.type === 'TRIGGER_PASTE') {
@@ -1381,6 +1395,12 @@ window.addEventListener('message', async function(event) {
     console.log('🔍 调试信息 - 站点处理器:', siteHandler);
     
     if (siteHandler && siteHandler.searchHandler && event.data.query) {
+        // 记录本次搜索关联的 historyId（父页面会在消息里携带）
+        if (event.data.historyId) {
+            __aiCompareHistoryContext.historyId = event.data.historyId;
+            __aiCompareHistoryContext.siteName = siteHandler.name;
+        }
+
         console.log(`✅ 使用 ${siteHandler.name} 配置化处理器处理消息`);
         console.log('🔍 调试信息 - 搜索处理器配置:', siteHandler.searchHandler);
         try {
@@ -1396,7 +1416,11 @@ window.addEventListener('message', async function(event) {
             });
             if (siteHandler.historyHandler && siteHandler.historyHandler.urlFeature) {
                 console.log(`✅ 启动 ${siteHandler.name} 的 URL 检测，特征: ${siteHandler.historyHandler.urlFeature}`);
-                startHistoryUrlDetection(siteHandler.name, siteHandler.historyHandler.urlFeature);
+                startHistoryUrlDetection(
+                    siteHandler.name,
+                    siteHandler.historyHandler.urlFeature,
+                    event.data.historyId || __aiCompareHistoryContext.historyId
+                );
             } else {
                 console.warn(`⚠️ ${siteHandler.name} 未配置 historyHandler 或 urlFeature，跳过 URL 检测`);
             }
@@ -1629,8 +1653,9 @@ async function extractWithConfig(contentExtractor, siteName) {
 
 // 启动历史记录 URL 检测
 // 持续检测当前页面的 URL 是否包含指定的 urlFeature，如果匹配则通知父窗口更新历史记录
-function startHistoryUrlDetection(siteName, urlFeature) {
+function startHistoryUrlDetection(siteName, urlFeature, historyId) {
   console.log(`🔍 开始检测 ${siteName} 的 URL 特征: ${urlFeature}`);
+  const targetHistoryId = historyId || __aiCompareHistoryContext.historyId || null;
   
   let lastMatchedUrl = null; // 记录上一次匹配的 URL，避免重复发送
   let checkInterval = null;
@@ -1655,7 +1680,8 @@ function startHistoryUrlDetection(siteName, urlFeature) {
             type: 'HISTORY_URL_UPDATE',
             source: 'inject-script',
             siteName: siteName,
-            url: currentUrl
+            url: currentUrl,
+            historyId: targetHistoryId
           }, '*');
           
           console.log(`📤 已通知父窗口更新 ${siteName} 的历史记录 URL`);

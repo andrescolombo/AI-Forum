@@ -1109,7 +1109,7 @@ function createSingleIframe(siteName, url, container, query) {
       if (iframe.contentWindow && event.source === iframe.contentWindow) {
         const siteName = event.data.siteName;
         const url = event.data.url;
-        const historyId = window._currentHistoryId;
+        const historyId = event.data.historyId || window._currentHistoryId;
         
         if (siteName && url && historyId) {
           console.log(`📝 收到 ${siteName} 的 URL 更新: ${url}，历史记录 ID: ${historyId}`);
@@ -1299,7 +1299,7 @@ async function getIframeHandler(iframeUrl) {
         // 匹配域名
         if (domain === siteDomain || domain.includes(siteDomain) || siteDomain.includes(domain)) {
           // 返回简化的处理函数
-          return async function(iframe, query) {
+          return async function(iframe, query, historyId) {
             try {
               // 等待页面加载
               await new Promise(resolve => setTimeout(resolve, 2000));
@@ -1308,7 +1308,8 @@ async function getIframeHandler(iframeUrl) {
               iframe.contentWindow.postMessage({
                 type: 'search',
                 query: query,
-                domain: domain
+                domain: domain,
+                historyId: historyId || null
               }, '*');
               
               console.log(`已向 ${domain} 发送搜索消息`);
@@ -1915,12 +1916,26 @@ function shanshuo() {
 
 
 async function iframeFresh(query) {    
+      // 立即记录历史：不需要等待 iframe 加载完成（sites 会由后续机制更新）
+      // 并返回本次 PK 的 historyId，避免后续 iframe URL 更新“写错历史记录”
+      let historyId = null;
+      try {
+        historyId = await savePKHistory(query);
+      } catch (error) {
+        console.error('立即保存 PK 历史记录失败（将继续执行 PK）:', error);
+      }
         
       // 获取所有 iframe
       const iframes = document.querySelectorAll('iframe');
           // 使用 getDefaultSites 获取合并后的站点配置
      
-      const sites = await getDefaultSites();
+      let sites = [];
+      try {
+        sites = await getDefaultSites();
+      } catch (error) {
+        console.error('getDefaultSites 获取失败（将继续执行 PK）:', error);
+        sites = [];
+      }
 
         // 遍历每个 iframe
       iframes.forEach(iframe => {
@@ -1940,6 +1955,22 @@ async function iframeFresh(query) {
                 // 根据 URL 和 query 拼接新的 URL
                 const newUrl = url.replace('{query}', encodeURIComponent(query));
                 console.log(`为 ${siteName} iframe 生成新的 URL: ${newUrl}`);
+                // URL 查询站点会直接导航：在新页面 load 后再下发 history 上下文
+                if (historyId) {
+                  const onLoadSendHistoryContext = () => {
+                    try {
+                      iframe.removeEventListener('load', onLoadSendHistoryContext);
+                      iframe.contentWindow?.postMessage({
+                        type: 'SET_HISTORY_CONTEXT',
+                        historyId,
+                        siteName
+                      }, '*');
+                    } catch (e) {
+                      // ignore
+                    }
+                  };
+                  iframe.addEventListener('load', onLoadSendHistoryContext);
+                }
                 // 让 iframe 访问新的 URL
                 iframe.src = newUrl;
             }
@@ -1951,8 +1982,20 @@ async function iframeFresh(query) {
                       时间: new Date().toISOString(),
                       query: query
                   });
+                  // 下发 history 上下文（不依赖 inject 是否处理 search 携带的 historyId）
+                  if (historyId) {
+                    try {
+                      iframe.contentWindow?.postMessage({
+                        type: 'SET_HISTORY_CONTEXT',
+                        historyId,
+                        siteName
+                      }, '*');
+                    } catch (e) {
+                      // ignore
+                    }
+                  }
                   // 调用处理函数
-                  handler(iframe, query);
+                  handler(iframe, query, historyId);
                 } else {
                   console.log('没有找到处理函数');
                 }
@@ -1964,16 +2007,6 @@ async function iframeFresh(query) {
             console.error('处理 iframe 失败:', error);
         }
     });
-    
-    // 等待所有 iframe 加载完成后，记录历史
-    setTimeout(async () => {
-      await savePKHistory(query);
-    }, 3000); // 等待3秒让所有 iframe 加载完成
-      
-      
-  
-
-
 }
 
 
@@ -2099,13 +2132,13 @@ async function loadHistoryIframes(sites) {
 async function savePKHistory(query) {
   try {
     if (!query || query.trim() === '') {
-      return; // 如果查询为空，不保存
+      return null; // 如果查询为空，不保存
     }
     
     // 获取所有 iframe
     const iframes = document.querySelectorAll('.ai-iframe');
     if (iframes.length === 0) {
-      return; // 如果没有 iframe，不保存
+      return null; // 如果没有 iframe，不保存
     }
     
     // 收集所有站点的名称（不收集 URL，URL 将由各 iframe 内部脚本检测并保存）
@@ -2118,7 +2151,7 @@ async function savePKHistory(query) {
     });
     
     if (siteNames.length === 0) {
-      return; // 如果没有有效的站点，不保存
+      return null; // 如果没有有效的站点，不保存
     }
     
     // 创建历史记录项（只保存 ID 和 query，sites 初始为空数组）
@@ -2165,8 +2198,10 @@ async function savePKHistory(query) {
     window._currentHistoryId = historyId;
     
     console.log('PK 历史记录已创建（待 iframe 更新 URL）:', historyItem);
+    return historyId;
   } catch (error) {
     console.error('保存 PK 历史记录失败:', error);
+    return null;
   }
 }
 
