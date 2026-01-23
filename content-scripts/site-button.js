@@ -70,9 +70,17 @@
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
           createSiteButton(currentSite);
+          // 如果配置了 userPromptButton，创建 userprompt 按钮
+          if (currentSite.userPromptButton) {
+            createUserPromptButtons(currentSite);
+          }
         });
       } else {
         createSiteButton(currentSite);
+        // 如果配置了 userPromptButton，创建 userprompt 按钮
+        if (currentSite.userPromptButton) {
+          createUserPromptButtons(currentSite);
+        }
       }
     } catch (error) {
       console.error('初始化站点按钮失败:', error);
@@ -440,5 +448,216 @@
         }
       }
     }
+  }
+
+  /**
+   * 创建 userprompt 按钮
+   * 在每个用户消息旁边显示"多AI 对比"按钮
+   */
+  function createUserPromptButtons(site) {
+    const userPromptConfig = site.userPromptButton;
+    if (!userPromptConfig || !userPromptConfig.containerSelector) {
+      console.log('未配置 userPromptButton');
+      return;
+    }
+
+    const containerSelector = userPromptConfig.containerSelector;
+    const textSelector = userPromptConfig.textSelector || containerSelector;
+
+    // 用于跟踪已经添加过按钮的容器
+    const processedContainers = new WeakSet();
+
+    /**
+     * 从 userprompt 容器中提取文本
+     */
+    function extractUserPromptText(container) {
+      if (!container) return '';
+
+      // 如果配置了 textSelector，使用它
+      if (textSelector) {
+        try {
+          const textElement = container.querySelector(textSelector);
+          if (textElement) {
+            return textElement.innerText || textElement.textContent || '';
+          }
+        } catch (e) {
+          console.error('提取 userprompt 文本失败:', e);
+        }
+      }
+
+      // 回退：直接使用容器的文本
+      return container.innerText || container.textContent || '';
+    }
+
+    /**
+     * 在 userprompt 容器旁边插入按钮
+     */
+    function insertUserPromptButton(container) {
+      // 检查是否已经添加过按钮
+      if (processedContainers.has(container)) {
+        return;
+      }
+
+      // 检查容器中是否已经有按钮
+      const existingButton = container.querySelector('.multi-ai-userprompt-button');
+      if (existingButton) {
+        processedContainers.add(container);
+        return;
+      }
+
+      // 创建按钮容器
+      const buttonContainer = document.createElement('div');
+      buttonContainer.className = 'multi-ai-userprompt-button-container';
+      buttonContainer.style.cssText = 'display: inline-flex; align-items: center; margin-left: 8px; vertical-align: middle;';
+
+      // 创建按钮
+      const button = document.createElement('button');
+      button.className = 'multi-ai-userprompt-button';
+      button.textContent = '多AI 对比';
+      button.title = '使用多AI对比搜索';
+      button.setAttribute('aria-label', '使用多AI对比搜索');
+      button.style.cssText = `
+        padding: 4px 8px;
+        font-size: 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #fff;
+        cursor: pointer;
+        color: #333;
+        transition: all 0.2s;
+      `;
+
+      // 添加悬停效果
+      button.addEventListener('mouseenter', () => {
+        button.style.background = '#f0f0f0';
+        button.style.borderColor = '#999';
+      });
+      button.addEventListener('mouseleave', () => {
+        button.style.background = '#fff';
+        button.style.borderColor = '#ccc';
+      });
+
+      // 添加点击事件
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const query = extractUserPromptText(container).trim();
+        if (!query) {
+          console.log('userprompt 文本为空');
+          return;
+        }
+
+        // 通过 background.js 打开 iframe.html
+        chrome.runtime.sendMessage({
+          action: 'createComparisonPage',
+          query: query
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error('打开 iframe 页面失败:', chrome.runtime.lastError);
+          } else {
+            console.log('Message response:', response);
+          }
+        });
+      });
+
+      buttonContainer.appendChild(button);
+
+      // 尝试在容器旁边插入按钮
+      // 优先尝试在容器后面插入
+      try {
+        container.insertAdjacentElement('afterend', buttonContainer);
+      } catch (e) {
+        // 如果失败，尝试在容器内部插入（在文本内容后面）
+        try {
+          // 查找文本元素，在它后面插入
+          if (textSelector && textSelector !== containerSelector) {
+            const textElement = container.querySelector(textSelector);
+            if (textElement) {
+              textElement.insertAdjacentElement('afterend', buttonContainer);
+            } else {
+              container.appendChild(buttonContainer);
+            }
+          } else {
+            // 如果没有单独的文本选择器，直接在容器末尾插入
+            container.appendChild(buttonContainer);
+          }
+        } catch (e2) {
+          // 如果还是失败，尝试在父容器中插入
+          const parent = container.parentElement;
+          if (parent) {
+            try {
+              const nextSibling = container.nextSibling;
+              if (nextSibling) {
+                parent.insertBefore(buttonContainer, nextSibling);
+              } else {
+                parent.appendChild(buttonContainer);
+              }
+            } catch (e3) {
+              console.error('插入 userprompt 按钮失败:', e3);
+            }
+          }
+        }
+      }
+
+      processedContainers.add(container);
+    }
+
+    /**
+     * 处理所有现有的 userprompt 容器
+     */
+    function processExistingContainers() {
+      try {
+        const containers = document.querySelectorAll(containerSelector);
+        containers.forEach(container => {
+          if (container && !processedContainers.has(container)) {
+            insertUserPromptButton(container);
+          }
+        });
+      } catch (e) {
+        console.error('处理现有 userprompt 容器失败:', e);
+      }
+    }
+
+    /**
+     * 使用 MutationObserver 监听新的 userprompt 出现
+     */
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // 检查新添加的节点是否是 userprompt 容器
+            try {
+              if (node.matches && node.matches(containerSelector)) {
+                insertUserPromptButton(node);
+              }
+              // 检查新添加的节点内部是否包含 userprompt 容器
+              const containers = node.querySelectorAll ? node.querySelectorAll(containerSelector) : [];
+              containers.forEach(container => {
+                if (!processedContainers.has(container)) {
+                  insertUserPromptButton(container);
+                }
+              });
+            } catch (e) {
+              // 忽略选择器错误
+            }
+          }
+        });
+      });
+    });
+
+    // 开始观察
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    // 立即处理现有的容器
+    processExistingContainers();
+
+    // 定期检查（处理动态加载的内容）
+    setInterval(() => {
+      processExistingContainers();
+    }, 1000);
   }
 })();

@@ -561,21 +561,6 @@ async function initializeActionLinks() {
         const config = await AppConfigManager.loadConfig();
         const externalLinks = config.externalLinks || {};
         
-        // 五星好评链接
-        const rateLink = document.getElementById('rateLink');
-        if (rateLink) {
-            rateLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                // 从配置中获取评论链接
-                const reviewUrl = externalLinks.reviewLink || 
-                    `https://chrome.google.com/webstore/detail/${chrome.runtime.id}/reviews`;
-                trackEvent('homepage_review_click', {
-                    has_review_link: Boolean(externalLinks.reviewLink)
-                });
-                chrome.tabs.create({ url: reviewUrl });
-            });
-        }
-        
         // 用户反馈链接
         const feedbackLink = document.getElementById('feedbackLink');
         if (feedbackLink) {
@@ -593,15 +578,6 @@ async function initializeActionLinks() {
     } catch (error) {
         console.error('加载配置失败:', error);
         // 如果配置加载失败，使用默认链接
-        const rateLink = document.getElementById('rateLink');
-        if (rateLink) {
-            rateLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                const defaultReviewUrl = `https://chrome.google.com/webstore/detail/${chrome.runtime.id}/reviews`;
-                chrome.tabs.create({ url: defaultReviewUrl });
-            });
-        }
-        
         const feedbackLink = document.getElementById('feedbackLink');
         if (feedbackLink) {
             feedbackLink.addEventListener('click', (e) => {

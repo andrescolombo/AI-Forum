@@ -85,6 +85,10 @@
       },
       "historyHandler": {
         "urlFeature": "/c/"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-message-author-role=\"user\"]",
+        "textSelector": "[data-message-author-role=\"user\"]"
       }
     },
     {
@@ -170,6 +174,10 @@
       },
       "historyHandler": {
         "urlFeature": "/app/"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-message-author-role=\"user\"], .user-message",
+        "textSelector": "[data-message-author-role=\"user\"], .user-message"
       }
     },
     {
@@ -288,6 +296,10 @@
       },
       "historyHandler": {
         "urlFeature": "/c/"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-message-author-role=\"user\"]",
+        "textSelector": "[data-message-author-role=\"user\"]"
       }
     },
     {
@@ -413,6 +425,10 @@
       },
       "historyHandler": {
         "urlFeature": "/chat/"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-testid=\"user-message\"]",
+        "textSelector": "[data-testid=\"user-message\"]"
       }
     },
     {
@@ -503,6 +519,10 @@
       },
       "historyHandler": {
         "urlFeature": "/prompts/"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-testid^=\"message-prompt\"]",
+        "textSelector": "[data-testid^=\"message-prompt\"] .markdown"
       }
     },
     {
@@ -616,6 +636,10 @@
       },
       "historyHandler": {
         "urlFeature": "/chat/"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-message-author-role=\"user\"]",
+        "textSelector": "[data-message-author-role=\"user\"]"
       }
     },
     {
@@ -727,6 +751,10 @@
       },
       "historyHandler": {
         "urlFeature": "/chat/"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-message-author-role=\"user\"]",
+        "textSelector": "[data-message-author-role=\"user\"]"
       }
     },
     {
@@ -825,6 +853,10 @@
       },
       "historyHandler": {
         "urlFeature": "/search-v2/"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-message-author-role=\"user\"], .user-message, .user-prompt",
+        "textSelector": "[data-message-author-role=\"user\"], .user-message, .user-prompt"
       }
     },
     {
@@ -946,6 +978,10 @@
           ".yc-editor",
           "[class*=\"yc-editor\"]"
         ]
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-message-author-role=\"user\"]",
+        "textSelector": "[data-message-author-role=\"user\"]"
       }
     },
     {
@@ -1071,6 +1107,10 @@
       },
       "historyHandler": {
         "urlFeature": "-"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-message-author-role=\"user\"]",
+        "textSelector": "[data-message-author-role=\"user\"]"
       }
     },
     {
@@ -1315,6 +1355,10 @@
       },
       "historyHandler": {
         "urlFeature": "/chat/"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-message-author-role=\"user\"]",
+        "textSelector": "[data-message-author-role=\"user\"]"
       }
     },
     
@@ -1439,6 +1483,10 @@
       },
       "historyHandler": {
         "urlFeature": "/chat/"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-message-author-role=\"user\"]",
+        "textSelector": "[data-message-author-role=\"user\"]"
       }
     },
     {
@@ -1560,6 +1608,10 @@
       },
       "historyHandler": {
         "urlFeature": "/chat/"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-message-author-role=\"user\"]",
+        "textSelector": "[data-message-author-role=\"user\"]"
       }
     },
     {
@@ -1703,6 +1755,10 @@
       },
       "historyHandler": {
         "urlFeature": "/chats/"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-message-author-role=\"user\"], .user-message",
+        "textSelector": "[data-message-author-role=\"user\"], .user-message"
       }
     },
     {
@@ -1781,6 +1837,10 @@
       },
       "historyHandler": {
         "urlFeature": "/chat/"
+      },
+      "userPromptButton": {
+        "containerSelector": "[data-message-author-role=\"user\"], .user-message",
+        "textSelector": "[data-message-author-role=\"user\"], .user-message"
       }
     },
     {

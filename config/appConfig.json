@@ -8,7 +8,7 @@
     "iframe": false
   },
   "buttonConfig": {
-    "floatButton": true,
+    "floatButton": false,
     "selectionSearch": true,
     "contextMenu": true,
     "searchEngine": true

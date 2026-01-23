@@ -447,8 +447,10 @@ function handleCloseOption(option, container) {
 
 // 初始化
 // 获取按钮配置
-chrome.storage.sync.get(['buttonConfig', 'disabledSites'], function(result) {
-  const buttonConfig = result.buttonConfig || { floatButton: true };
+chrome.storage.sync.get(['buttonConfig', 'disabledSites'], async function(result) {
+  // 从 appConfig.json 获取默认配置
+  const defaultButtonConfig = await window.AppConfigManager.getButtonConfig();
+  const buttonConfig = result.buttonConfig || defaultButtonConfig;
   const disabledSites = result.disabledSites || [];
   const currentDomain = window.location.hostname;
   

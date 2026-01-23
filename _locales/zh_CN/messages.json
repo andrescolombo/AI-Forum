@@ -175,6 +175,9 @@
   "disabledSitesDescription": {
     "message": "管理悬浮球被禁用的网站，您可以在这里重新启用悬浮球"
   },
+  "noDisabledSites": {
+    "message": "暂无禁用的网站"
+  },
   "searchProviderName": {
     "message": "AI比一比"
   },
@@ -315,9 +318,6 @@
   "pinGuideSteps": {
     "message": "点击工具栏的拼图图标 → 找到「AI比一比」→ 点击固定图标"
   },
-  "rateOnStore": {
-    "message": "去商店评分"
-  },
   "userFeedback": {
     "message": "用户反馈"
   },
@@ -332,8 +332,5 @@
   },
   "noSitesSelected": {
     "message": "请至少选择一个站点"
-  },
-  "saveFailed": {
-    "message": "保存失败，请重试"
   }
 } 

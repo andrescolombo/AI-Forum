@@ -82,12 +82,11 @@ async function initializeButtonConfigs() {
   try {
     // 获取存储的按钮配置
     let { buttonConfig } = await chrome.storage.sync.get(['buttonConfig']);
-    let currentConfig = buttonConfig || {
-      floatButton: true,
-      selectionSearch: true,
-      contextMenu: true,
-      searchEngine: true
-    };
+    
+    // 从 appConfig.json 获取默认配置
+    const defaultButtonConfig = await window.AppConfigManager.getButtonConfig();
+    
+    let currentConfig = buttonConfig || defaultButtonConfig;
 
     console.log('初始配置:', currentConfig);
 
@@ -606,7 +605,7 @@ async function initializeDisabledSites() {
     if (disabledSites.length === 0) {
       container.innerHTML = `
         <div class="empty-state" style="text-align: center; color: #999; padding: 40px;">
-          <p>暂无禁用的网站</p>
+          <p>${chrome.i18n.getMessage('noDisabledSites')}</p>
         </div>
       `;
       return;

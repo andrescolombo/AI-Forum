@@ -88,7 +88,7 @@
     "description": "Title for shortcut entry configuration"
   },
   "floatButton": {
-    "message": "Float Ball",
+    "message": "Float Button",
     "description": "The name for the float button"
   },
   "selectionSearch": {
@@ -179,6 +179,9 @@
   },
   "disabledSitesDescription": {
     "message": "Manage websites where the floating button is disabled. You can re-enable the floating button here."
+  },
+  "noDisabledSites": {
+    "message": "No disabled websites"
   },
   "searchProviderName": {
     "message": "AI Compare"
@@ -320,9 +323,6 @@
   "pinGuideSteps": {
     "message": "Click the puzzle icon in the toolbar → Find \"AI Compare\" → Click the pin icon"
   },
-  "rateOnStore": {
-    "message": "Rate on Chrome Web Store"
-  },
   "userFeedback": {
     "message": "User Feedback"
   },
@@ -337,8 +337,5 @@
   },
   "noSitesSelected": {
     "message": "Please select at least one site"
-  },
-  "saveFailed": {
-    "message": "Save failed, please try again"
   }
 } 
