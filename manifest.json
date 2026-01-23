@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_appName__",
-  "version": "2.15.7",
+  "version": "2.15.8",
   "description": "__MSG_extDescription__",
   "permissions": [
     "storage",
@@ -77,6 +77,15 @@
         "config/baseConfig.js",
         "content-scripts/search-engines.js"
       ]
+    },
+    {
+      "matches": ["<all_urls>"],
+      "css": ["content-scripts/site-button.css"],
+      "js": [
+        "config/baseConfig.js",
+        "content-scripts/site-button.js"
+      ],
+      "run_at": "document_end"
     }
   ],
   "default_locale": "en",

@@ -315,10 +315,25 @@
   "pinGuideSteps": {
     "message": "点击工具栏的拼图图标 → 找到「AI比一比」→ 点击固定图标"
   },
-  "fiveStarRating": {
-    "message": "五星好评"
+  "rateOnStore": {
+    "message": "去商店评分"
   },
   "userFeedback": {
     "message": "用户反馈"
+  },
+  "saveFavoriteSites": {
+    "message": "保存"
+  },
+  "saveFavoriteSitesTitle": {
+    "message": "保存当前选中的站点为常用站点"
+  },
+  "favoriteSitesSaved": {
+    "message": "常用站点已保存"
+  },
+  "noSitesSelected": {
+    "message": "请至少选择一个站点"
+  },
+  "saveFailed": {
+    "message": "保存失败，请重试"
   }
 } 

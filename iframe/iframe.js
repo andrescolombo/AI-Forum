@@ -1568,13 +1568,13 @@ async function initializeSiteSettings() {
                 await chrome.storage.sync.set({ sites: updatedUserSettings });
                 
                 // 显示成功提示
-                showToast('设置已保存');
+                showToast(chrome.i18n.getMessage('saveSuccess') || '设置已保存');
                 
                 console.log('站点设置已更新:', updatedUserSettings);
                 
             } catch (error) {
                 console.error('保存站点设置失败:', error);
-                showToast('保存设置失败');
+                showToast(chrome.i18n.getMessage('saveFailed') || '保存设置失败');
             }
         });
         

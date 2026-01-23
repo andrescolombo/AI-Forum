@@ -106,6 +106,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     // 初始化站点列表
     await initializeSitesList();
     
+    // 初始化保存按钮（确保即使站点列表加载失败也能初始化）
+    initializeSaveSitesButton();
+    
     // 初始化操作链接
     initializeActionLinks();
 });
@@ -404,6 +407,91 @@ async function initializeSitesList() {
             sitesList.innerHTML = '<div style="padding: 20px; color: #666; text-align: center;">加载站点配置失败，请刷新页面重试</div>';
         }
     }
+}
+
+// 初始化保存站点按钮
+function initializeSaveSitesButton() {
+    const saveBtn = document.getElementById('saveSitesBtn');
+    
+    if (!saveBtn) {
+        console.error('保存按钮未找到: saveSitesBtn');
+        return;
+    }
+    
+    console.log('保存按钮已找到，开始绑定事件');
+    
+    // 设置按钮的 title 属性（国际化）
+    const saveTitle = chrome.i18n.getMessage('saveFavoriteSitesTitle') || 
+        chrome.i18n.getMessage('saveFavoriteSites') || 
+        '保存当前选中的站点为常用站点';
+    saveBtn.title = saveTitle;
+    
+    // 点击保存按钮
+    saveBtn.addEventListener('click', async (e) => {
+        console.log('保存按钮被点击');
+        e.preventDefault();
+        e.stopPropagation();
+        
+        try {
+            // 获取当前选中的站点
+            const selectedSites = getSelectedSites();
+            console.log('选中的站点:', selectedSites);
+            
+            if (selectedSites.length === 0) {
+                showToast(chrome.i18n.getMessage('noSitesSelected') || '请至少选择一个站点');
+                return;
+            }
+            
+            // 1. 读取现有的用户设置
+            const { sites: existingUserSettings = {} } = await chrome.storage.sync.get('sites');
+            console.log('现有的用户设置:', existingUserSettings);
+            
+            // 2. 获取所有可用站点（用于更新所有站点的 enabled 状态）
+            const allSites = await getDefaultSites();
+            console.log('所有可用站点数量:', allSites.length);
+            
+            if (!allSites || allSites.length === 0) {
+                console.error('无法获取站点列表，保存失败');
+                showToast(chrome.i18n.getMessage('saveFailed') || '保存失败，请重试');
+                return;
+            }
+            
+            const allSiteNames = allSites.map(site => site.name);
+            console.log('所有站点名称:', allSiteNames);
+            
+            // 3. 更新用户设置：选中的站点 enabled=true，未选中的 enabled=false
+            const updatedUserSettings = { ...existingUserSettings };
+            allSiteNames.forEach(siteName => {
+                if (!updatedUserSettings[siteName]) {
+                    updatedUserSettings[siteName] = {};
+                }
+                // 根据是否在选中列表中设置 enabled 状态
+                updatedUserSettings[siteName].enabled = selectedSites.includes(siteName);
+            });
+            
+            console.log('更新后的用户设置:', updatedUserSettings);
+            
+            // 4. 保存到 chrome.storage.sync.sites
+            await chrome.storage.sync.set({ sites: updatedUserSettings });
+            console.log('已保存到 chrome.storage.sync.sites');
+            
+            // 记录分析事件
+            trackEvent('homepage_save_favorite_sites', {
+                sites_count: selectedSites.length,
+                sites: selectedSites
+            });
+            
+            // 显示成功提示
+            showToast(chrome.i18n.getMessage('saveSuccess') || '配置已保存');
+            
+            console.log('常用站点已保存到 sites:', updatedUserSettings);
+        } catch (error) {
+            console.error('保存常用站点失败:', error);
+            showToast(chrome.i18n.getMessage('saveFailed') || '保存失败，请重试');
+        }
+    });
+    
+    console.log('保存按钮事件绑定完成');
 }
 
 // 添加上传附件按钮点击事件

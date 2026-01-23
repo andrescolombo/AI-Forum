@@ -10,7 +10,9 @@ const DEV_CONFIG = {
   IS_PRODUCTION: true,  // 开发时设为 false，发布时设为 true
   SKIP_REMOTE_CONFIG: true,  // 开发时跳过远程配置，直接使用本地文件
   ENABLE_CONFIG_CACHE: false, // 开发时禁用配置缓存，确保修改立即生效
-  FORCE_LOCAL_CONFIG: true   // 开发时强制使用本地配置文件
+  FORCE_LOCAL_CONFIG: true,   // 开发时强制使用本地配置文件
+  ENABLE_SITE_BUTTON: false  // site-button 是否生效的开关
+
 };
 
 // 生产环境 console 重写（仅在 production 模式下）
@@ -592,9 +594,13 @@ else {
       isProduction: DEV_CONFIG.IS_PRODUCTION,
       skipRemoteConfig: DEV_CONFIG.SKIP_REMOTE_CONFIG,
       enableConfigCache: DEV_CONFIG.ENABLE_CONFIG_CACHE,
-      forceLocalConfig: DEV_CONFIG.FORCE_LOCAL_CONFIG
+      forceLocalConfig: DEV_CONFIG.FORCE_LOCAL_CONFIG,
+      enableSiteButton: DEV_CONFIG.ENABLE_SITE_BUTTON
     };
   };
+  
+  // 暴露 ENABLE_SITE_BUTTON 配置到 window 对象
+  window.ENABLE_SITE_BUTTON = DEV_CONFIG.ENABLE_SITE_BUTTON;
   
   // 标记配置已加载，避免重复声明
   if (typeof window !== 'undefined') {

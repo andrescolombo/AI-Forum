@@ -332,6 +332,10 @@ html, body {
 
 .sites-header {
     margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
 }
 
 .sites-title {
@@ -339,6 +343,48 @@ html, body {
     font-weight: 600;
     color: #333;
     margin: 0;
+}
+
+.save-settings-btn {
+    position: absolute;
+    right: 0;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 6px;
+    background-color: #fff !important;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s, opacity 0.2s;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.sites-section:hover .save-settings-btn {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.save-settings-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+.save-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.save-settings-btn:active {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    transform: scale(0.95);
 }
 
 .sites-list {

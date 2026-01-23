@@ -320,10 +320,25 @@
   "pinGuideSteps": {
     "message": "Click the puzzle icon in the toolbar → Find \"AI Compare\" → Click the pin icon"
   },
-  "fiveStarRating": {
-    "message": "5-Star Rating"
+  "rateOnStore": {
+    "message": "Rate on Chrome Web Store"
   },
   "userFeedback": {
     "message": "User Feedback"
+  },
+  "saveFavoriteSites": {
+    "message": "Save"
+  },
+  "saveFavoriteSitesTitle": {
+    "message": "Save selected sites as favorites"
+  },
+  "favoriteSitesSaved": {
+    "message": "Favorite sites saved"
+  },
+  "noSitesSelected": {
+    "message": "Please select at least one site"
+  },
+  "saveFailed": {
+    "message": "Save failed, please try again"
   }
 } 
