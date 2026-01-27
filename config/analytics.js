@@ -1,15 +1,34 @@
 // analytics.js
 
 const ANALYTICS_EVENTS = {
+  // 首页相关
   HOMEPAGE_SEARCH_SUBMIT: 'homepage_search_submit',
   HOMEPAGE_UPLOAD_CLICK: 'homepage_upload_click',
   HOMEPAGE_SITE_TOGGLE: 'homepage_site_toggle',
   HOMEPAGE_REVIEW_CLICK: 'homepage_review_click',
   HOMEPAGE_FEEDBACK_CLICK: 'homepage_feedback_click',
+  HOMEPAGE_SETTINGS_CLICK: 'homepage_settings_click',
+  HOMEPAGE_HISTORY_CLICK: 'homepage_history_click',
+  HOMEPAGE_FAVORITES_CLICK: 'homepage_favorites_click',
+  HOMEPAGE_SAVE_FAVORITE_SITES: 'homepage_save_favorite_sites',
+  HOMEPAGE_PROMPT_TEMPLATES_SETTINGS_CLICK: 'homepage_prompt_templates_settings_click',
+
+  // iframe 主功能相关
   IFRAME_SEARCH_SUBMIT: 'iframe_search_submit',
   IFRAME_UPLOAD_CLICK: 'iframe_upload_click',
   IFRAME_EXPORT_CLICK: 'iframe_export_click',
-  IFRAME_SITE_TOGGLE: 'iframe_site_toggle'
+  IFRAME_SITE_TOGGLE: 'iframe_site_toggle',
+
+  // iframe 站点收藏相关
+  IFRAME_SITE_FAVORITE_TOGGLE: 'iframe_site_favorite_toggle',
+  IFRAME_FAVORITE_ALL_IFRAMES: 'iframe_favorite_all_iframes',
+
+  // iframe 提示词收藏相关
+  IFRAME_PROMPT_FAVORITE_TOGGLE: 'iframe_prompt_favorite_toggle',
+  IFRAME_PROMPT_FAVORITES_OPEN: 'iframe_prompt_favorites_open',
+  IFRAME_PROMPT_FAVORITE_SELECT: 'iframe_prompt_favorite_select',
+  IFRAME_PROMPT_FAVORITE_DELETE: 'iframe_prompt_favorite_delete',
+  IFRAME_PROMPT_FAVORITE_EDIT_CLICK: 'iframe_prompt_favorite_edit_click'
 };
 
 let analyticsConfigCache = null;

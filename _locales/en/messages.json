@@ -42,6 +42,9 @@
   "openPage": {
     "message": "Tab Mode"
   },
+  "openInNewTab": {
+    "message": "Open in new tab"
+  },
   "commandDescription": {
     "message": "Hotkey: (⌘+M on Mac, Ctrl+M on Windows)"
   },

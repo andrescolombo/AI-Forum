@@ -37,6 +37,9 @@
   "openPage": {
     "message": "标签页模式"
   },
+  "openInNewTab": {
+    "message": "在新标签页打开"
+  },
   "commandDescription": {
     "message": "快捷键(Mac下 ⌘+M , Windows下 Ctrl+M)"
   },

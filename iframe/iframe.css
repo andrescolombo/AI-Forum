@@ -20,13 +20,25 @@ html {
   border-bottom: 1px solid #ddd;
 }
 
+.iframe-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
 
 .iframe-controls button {
-  margin-left: 8px;
   padding: 4px 8px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* 当鼠标悬停在 iframe-container 上时显示按钮 */
+.iframe-container:hover .iframe-controls button {
+  opacity: 1;
 }
 
 .ai-iframe {
@@ -597,6 +609,37 @@ html {
     min-width: fit-content;
 }
 
+.open-page-btn {
+    width: 16px;
+    height: 16px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+    position: relative;
+    font-size: 14px;
+    line-height: 16px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.open-page-btn::before {
+    content: '↗';
+    font-size: 14px;
+}
+
+/* 当 iframe-container hover 时，按钮显示并可以进一步 hover */
+.iframe-container:hover .open-page-btn {
+    opacity: 0.7;
+}
+
+.iframe-container:hover .open-page-btn:hover {
+    opacity: 1;
+    color: #333;
+}
+
 .close-btn {
     width: 16px;
     height: 16px;
@@ -605,11 +648,15 @@ html {
     background-size: contain;
     cursor: pointer;
     padding: 0;
-    opacity: 0.7;
     transition: opacity 0.3s;
 }
 
-.close-btn:hover {
+/* 当 iframe-container hover 时，按钮显示并可以进一步 hover */
+.iframe-container:hover .close-btn {
+    opacity: 0.7;
+}
+
+.iframe-container:hover .close-btn:hover {
     opacity: 1;
 }
 

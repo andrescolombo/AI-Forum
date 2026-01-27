@@ -228,6 +228,8 @@ async function showQuerySuggestions(query) {
         // 点击后在新标签页打开设置页面并跳转到模板编辑区域
         settingsIcon.addEventListener('click', (e) => {
             e.stopPropagation();
+            // 埋点：从首页提示词建议区域打开模板设置
+            trackEvent('homepage_prompt_templates_settings_click');
             window.open(chrome.runtime.getURL('options/options.html#prompt-templates'), '_blank');
         });
 

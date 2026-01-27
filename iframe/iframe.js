@@ -1036,6 +1036,54 @@ async function createIframes(query, sites) {
 }
 
 
+// 获取 iframe 的最新 URL
+// @param {HTMLIFrameElement} iframe - iframe 元素
+// @param {string} siteName - 站点名称
+// @param {string|null} historyId - 可选的历史记录 ID，如果提供则从历史记录中查找
+// @returns {Promise<string|null>} - 返回最新的 URL，如果无法获取则返回 null
+async function getIframeLatestUrl(iframe, siteName, historyId = null) {
+  try {
+    // 方法1: 尝试从 iframe.contentWindow.location.href 获取（如果同源）
+    try {
+      const currentUrl = iframe.contentWindow.location.href;
+      if (currentUrl && currentUrl !== 'about:blank') {
+        console.log(`从 iframe.contentWindow 获取 ${siteName} 的 URL:`, currentUrl);
+        return currentUrl;
+      }
+    } catch (e) {
+      // 跨域限制，无法直接访问
+      console.log(`无法直接访问 ${siteName} iframe 的 location（可能跨域）`);
+    }
+    
+    // 方法2: 从历史记录中获取该站点的最新 URL（如果提供了 historyId 或存在当前历史记录 ID）
+    const targetHistoryId = historyId || window._currentHistoryId;
+    if (targetHistoryId) {
+      const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
+      const historyItem = pkHistory.find(item => item.id === targetHistoryId);
+      if (historyItem && historyItem.sites) {
+        const siteItem = historyItem.sites.find(s => s.name === siteName);
+        if (siteItem && siteItem.url) {
+          console.log(`从历史记录获取 ${siteName} 的 URL:`, siteItem.url);
+          return siteItem.url;
+        }
+      }
+    }
+    
+    // 方法3: 使用 iframe.src 作为后备
+    const srcUrl = iframe.src;
+    if (srcUrl && srcUrl !== 'about:blank') {
+      console.log(`使用 iframe.src 作为 ${siteName} 的 URL:`, srcUrl);
+      return srcUrl;
+    }
+    
+    console.warn(`无法获取 ${siteName} 的 URL`);
+    return null;
+  } catch (error) {
+    console.error(`获取 ${siteName} 的 URL 失败:`, error);
+    // 出错时返回 iframe.src 作为后备
+    return iframe.src || null;
+  }
+}
 
 // 创建单个 iframe 时添加标识
 function createSingleIframe(siteName, url, container, query) {
@@ -1200,6 +1248,7 @@ function createSingleIframe(siteName, url, container, query) {
   header.innerHTML = `
     <span class="site-name">${siteName}</span>
     <div class="iframe-controls">
+      <button class="open-page-btn" title="在新标签页打开"></button>
       <button class="close-btn"></button>
     </div>
   `;
@@ -1223,7 +1272,25 @@ function createSingleIframe(siteName, url, container, query) {
   addFavoriteButtonToIframe(iframeContainer, siteName, false);
   
   // 添加按钮事件处理
+  const openPageBtn = header.querySelector('.open-page-btn');
   const closeBtn = header.querySelector('.close-btn');
+  
+  // 设置按钮的国际化标题
+  const openInNewTabTitle = chrome.i18n.getMessage('openInNewTab');
+  if (openInNewTabTitle) {
+    openPageBtn.title = openInNewTabTitle;
+  }
+  
+  // 打开页面按钮点击事件
+  openPageBtn.onclick = async (e) => {
+    e.stopPropagation();
+    // 获取 iframe 的最新 URL
+    const iframeUrl = await getIframeLatestUrl(iframe, siteName);
+    if (iframeUrl) {
+      // 在新标签页打开
+      chrome.tabs.create({ url: iframeUrl });
+    }
+  };
   
   closeBtn.onclick = () => {
     // 1. 获取对应的 iframe
@@ -1660,6 +1727,12 @@ async function favoriteAllIframes() {
             site.isFavorite = true;
         });
         
+        // 记录埋点：收藏当前记录的所有 iframe
+        trackEvent('iframe_favorite_all_iframes', {
+            history_id: historyId,
+            sites_count: historyItem.sites.length
+        });
+        
         // 保存更新后的历史记录
         await chrome.storage.local.set({ pkHistory: pkHistory });
         
@@ -1763,6 +1836,12 @@ async function toggleIframeFavorite(siteName, favoriteBtn) {
         }
         favoriteBtn.dataset.favorite = siteItem.isFavorite ? 'true' : 'false';
         favoriteBtn.title = siteItem.isFavorite ? '取消收藏' : '收藏';
+        
+        // 记录埋点：单个 iframe 收藏状态切换
+        trackEvent('iframe_site_favorite_toggle', {
+            site_name: siteName,
+            is_favorite: siteItem.isFavorite
+        });
         
         console.log(`✅ ${siteItem.isFavorite ? '已收藏' : '已取消收藏'} iframe: ${siteName}`);
     } catch (error) {
@@ -2118,12 +2197,33 @@ async function loadHistoryIframes(sites) {
       header.innerHTML = `
         <span class="site-name">${siteName}</span>
         <div class="iframe-controls">
+          <button class="open-page-btn" title="在新标签页打开"></button>
           <button class="close-btn"></button>
         </div>
       `;
       
-      // 添加关闭按钮事件
+      // 添加按钮事件
+      const openPageBtn = header.querySelector('.open-page-btn');
       const closeBtn = header.querySelector('.close-btn');
+      
+      // 设置按钮的国际化标题
+      const openInNewTabTitle = chrome.i18n.getMessage('openInNewTab');
+      if (openInNewTabTitle) {
+        openPageBtn.title = openInNewTabTitle;
+      }
+      
+      // 打开页面按钮点击事件
+      openPageBtn.onclick = async (e) => {
+        e.stopPropagation();
+        // 获取 iframe 的最新 URL
+        const iframeUrl = await getIframeLatestUrl(iframe, siteName);
+        if (iframeUrl) {
+          // 在新标签页打开
+          chrome.tabs.create({ url: iframeUrl });
+        }
+      };
+      
+      // 关闭按钮事件
       closeBtn.onclick = () => {
         iframeContainer.remove();
         const navItems = document.querySelectorAll('.nav-item');
@@ -2208,26 +2308,31 @@ async function savePKHistory(query) {
       return null; // 如果没有 iframe，不保存
     }
     
-    // 收集所有站点的名称（不收集 URL，URL 将由各 iframe 内部脚本检测并保存）
-    const siteNames = [];
-    iframes.forEach(iframe => {
+    // 收集所有站点的名称和 URL（尝试立即获取，如果获取不到则留空，由后续消息通信更新）
+    const sites = [];
+    for (const iframe of iframes) {
       const siteName = iframe.getAttribute('data-site');
       if (siteName) {
-        siteNames.push(siteName);
+        // 尝试立即获取 iframe 的最新 URL
+        const url = await getIframeLatestUrl(iframe, siteName);
+        sites.push({
+          name: siteName,
+          url: url || '', // 如果获取不到 URL，留空，由后续消息通信更新
+          isFavorite: false
+        });
       }
-    });
+    }
     
-    if (siteNames.length === 0) {
+    if (sites.length === 0) {
       return null; // 如果没有有效的站点，不保存
     }
     
-    // 创建历史记录项（只保存 ID 和 query，sites 初始为空数组）
-    // 各 iframe 内部的脚本会检测 URL 并更新对应的站点 URL
+    // 创建历史记录项（尝试立即获取 URL，如果获取不到则由各 iframe 内部脚本检测并更新）
     const historyId = Date.now().toString();
     const historyItem = {
       id: historyId,
       query: query.trim(),
-      sites: [], // 初始为空，由各 iframe 内部脚本检测 URL 后更新
+      sites: sites, // 尝试立即获取 URL，如果为空则由后续消息通信更新
       timestamp: Date.now(),
       date: new Date().toLocaleString('zh-CN', {
         year: 'numeric',
@@ -2818,11 +2923,21 @@ async function toggleFavorite() {
       favoritePrompts.splice(index, 1);
       favoriteIcon.src = '../icons/star_unsaved.png';
       console.log('取消收藏:', query);
+      // 埋点：取消收藏提示词
+      trackEvent('iframe_prompt_favorite_toggle', {
+        query_length: query.length,
+        is_favorite: false
+      });
     } else {
       // 添加收藏
       favoritePrompts.push(query);
       favoriteIcon.src = '../icons/star_saved.png';
       console.log('添加收藏:', query);
+      // 埋点：添加收藏提示词
+      trackEvent('iframe_prompt_favorite_toggle', {
+        query_length: query.length,
+        is_favorite: true
+      });
     }
     
     // 保存到存储
@@ -2886,6 +3001,11 @@ function showFavorites() {
         
         // 更新收藏按钮状态
         updateFavoriteButtonVisibility(prompt);
+
+        // 埋点：从收藏列表选择提示词
+        trackEvent('iframe_prompt_favorite_select', {
+          query_length: prompt.length
+        });
       });
       
       // 编辑按钮点击事件（如果存在）
@@ -2907,12 +3027,27 @@ function showFavorites() {
     });
   }
   
+  // 埋点：打开提示词收藏列表
+  trackEvent('iframe_prompt_favorites_open', {
+    favorites_count: favoritePrompts.length
+  });
+
   queryList.style.display = 'block';
 }
 
 // 编辑收藏项
 function editFavoriteItem(item) {
   console.log('进入编辑收藏项');
+  // 埋点：点击编辑收藏提示词（功能预留）
+  try {
+    const prompt = item.getAttribute('data-prompt');
+    trackEvent('iframe_prompt_favorite_edit_click', {
+      query_length: prompt ? prompt.length : 0
+    });
+  } catch (e) {
+    // 忽略埋点中的异常，避免影响主流程
+    console.warn('记录编辑收藏埋点失败:', e);
+  }
   showToast('coming soon');
 }
 
@@ -2936,6 +3071,10 @@ async function deleteFavoriteItem(item) {
       showFavorites();
       
       console.log('删除收藏提示词:', prompt);
+      // 埋点：删除收藏提示词
+      trackEvent('iframe_prompt_favorite_delete', {
+        query_length: prompt ? prompt.length : 0
+      });
     } catch (error) {
       console.error('删除收藏失败:', error);
     }
