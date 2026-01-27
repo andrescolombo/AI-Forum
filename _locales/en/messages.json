@@ -3,13 +3,13 @@
     "message": "AI Compare"
   },
   "appName": {
-    "message": "AI Compare - OneClick to compare ChatGPT, Gemini, Grok and more."
+    "message": "AI Compare - Compare Multiple AI Sites Side-by-Side in One Page"
   },
   "extDescription": {
-    "message": "AI Compare helps you find the best answer from multiple AI quickly."
+    "message": "Compare responses from ChatGPT, Gemini, Grok, Claude, and 10+ AI sites simultaneously in one page."
   },
   "configTitle": {
-    "message": " AI Sites"
+    "message": " AI Sites"   
   },
   "saveSuccess": {
     "message": "Configuration saved"
@@ -272,6 +272,12 @@
   },
   "historyTitle": {
     "message": "History"
+  },
+  "historyLink": {
+    "message": "History"
+  },
+  "favoritesLink": {
+    "message": "Favorites"
   },
   "historyMaxRecordsTip": {
     "message": "Only the latest $COUNT$ records are saved",

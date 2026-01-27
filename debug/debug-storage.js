@@ -416,11 +416,78 @@ async function loadHistory() {
     }
 }
 
+// 加载收藏记录（从历史记录中筛选包含收藏站点的记录）
+async function loadFavorites() {
+    const statusEl = document.getElementById('favorites-status');
+    const contentEl = document.getElementById('favorites-content');
+    
+    try {
+        console.log('开始加载收藏记录...');
+        statusEl.innerHTML = '<div class="loading-spinner"></div> 正在加载...';
+        statusEl.className = 'status loading';
+
+        if (!chrome?.storage?.local) {
+            throw new Error('Chrome Storage Local API 不可用');
+        }
+
+        const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
+        const favoriteItems = pkHistory
+            .filter(item => item.sites && item.sites.some(site => site.isFavorite === true))
+            .map(item => ({
+                ...item,
+                sites: item.sites.filter(site => site.isFavorite === true)
+            }));
+        console.log('收藏记录数据:', favoriteItems);
+
+        statusEl.textContent = '✅ 加载成功';
+        statusEl.className = 'status success';
+        
+        contentEl.textContent = formatJSON(favoriteItems);
+        
+        // 计算统计信息（与历史记录展示一致）
+        const stats = {};
+        if (favoriteItems.length > 0) {
+            stats.总数 = favoriteItems.length;
+            const latestDate = new Date(favoriteItems[0].timestamp);
+            const oldestDate = new Date(favoriteItems[favoriteItems.length - 1].timestamp);
+            stats.最新记录 = latestDate.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            stats.最旧记录 = oldestDate.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } else {
+            stats.总数 = 0;
+        }
+        renderStats(stats, 'favorites-stats');
+
+        console.log('收藏记录加载完成');
+
+    } catch (error) {
+        console.error('加载收藏记录失败:', error);
+        statusEl.textContent = `❌ 加载失败: ${error.message}`;
+        statusEl.className = 'status error';
+        contentEl.innerHTML = `<div class="error-message">
+            错误详情: ${error.message}<br>
+            错误堆栈: ${error.stack?.slice(0, 200)}...
+        </div>`;
+    }
+}
+
 // 刷新全部
 async function refreshAll() {
     console.log('开始刷新全部数据...');
     await Promise.all([
         loadHistory(),
+        loadFavorites(),
         loadLocalStorage(),
         loadSyncStorage(),
         loadLocalConfig(),
@@ -551,6 +618,8 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
         // 可以选择自动刷新对应的存储
         if (namespace === 'local') {
             loadLocalStorage();
+            loadHistory();
+            loadFavorites();
         } else if (namespace === 'sync') {
             loadSyncStorage();
         }
@@ -594,13 +663,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'loadHistory':
                     loadHistory();
                     break;
+                case 'loadFavorites':
+                    loadFavorites();
+                    break;
             }
         }
         
         // 保留原有的刷新按钮逻辑（兼容）
         if (e.target.textContent === '刷新' || e.target.classList.contains('refresh-btn')) {
-            const columnClass = e.target.closest('.column').classList[1];
-            switch(columnClass) {
+            const column = e.target.closest('.column');
+            const columnClass = column ? column.classList[1] : '';
+            const action = e.target.getAttribute('data-action');
+            if (action) {
+                // data-action 已在上方处理
+            } else switch(columnClass) {
                 case 'column-1':
                     loadLocalStorage();
                     break;
@@ -616,6 +692,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'column-5':
                     loadMergedSites();
                     break;
+                case 'column-6':
+                    loadHistory();
+                    break;
+                case 'column-7':
+                    loadFavorites();
+                    break;
             }
         }
     });
@@ -630,3 +712,5 @@ window.loadSyncStorage = loadSyncStorage;
 window.loadLocalConfig = loadLocalConfig;
 window.loadRemoteConfig = loadRemoteConfig;
 window.loadMergedSites = loadMergedSites;
+window.loadHistory = loadHistory;
+window.loadFavorites = loadFavorites;

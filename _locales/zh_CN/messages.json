@@ -3,10 +3,10 @@
     "message": "AI 比一比"
   },
   "appName": {
-    "message": "AI比一比 - 一键对比 ChatGPT, Gemini, Grok 等多个AI"
+    "message": "AI比一比 - 在同一页面同时对比多个AI网站"
   },
   "extDescription": {
-    "message": "帮你从十多个AI中快速找到最佳答案。"
+    "message": "在同一页面同时查询并对比 ChatGPT、Gemini、Grok、Claude 等十多个AI网站的回答。"
   },
   "configTitle": {
     "message": "AI站点设置"
@@ -268,6 +268,12 @@
   "historyTitle": {
     "message": "历史记录"
   },
+  "historyLink": {
+    "message": "历史记录"
+  },
+  "favoritesLink": {
+    "message": "收藏记录"
+  },
   "historyMaxRecordsTip": {
     "message": "只保存最近的$COUNT$条记录",
     "placeholders": {
@@ -319,7 +325,7 @@
     "message": "点击工具栏的拼图图标 → 找到「AI比一比」→ 点击固定图标"
   },
   "userFeedback": {
-    "message": "用户反馈"
+    "message": "需求反馈"
   },
   "saveFavoriteSites": {
     "message": "保存"

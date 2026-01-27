@@ -561,6 +561,30 @@ async function initializeActionLinks() {
         const config = await AppConfigManager.loadConfig();
         const externalLinks = config.externalLinks || {};
         
+        // 历史记录链接
+        const historyLink = document.getElementById('historyLink');
+        if (historyLink) {
+            historyLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                trackEvent('homepage_history_click');
+                chrome.tabs.create({ 
+                    url: chrome.runtime.getURL('history/history.html')
+                });
+            });
+        }
+        
+        // 收藏记录链接
+        const favoritesLink = document.getElementById('favoritesLink');
+        if (favoritesLink) {
+            favoritesLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                trackEvent('homepage_favorites_click');
+                chrome.tabs.create({ 
+                    url: chrome.runtime.getURL('favorites/favorites.html')
+                });
+            });
+        }
+        
         // 用户反馈链接
         const feedbackLink = document.getElementById('feedbackLink');
         if (feedbackLink) {
@@ -578,6 +602,26 @@ async function initializeActionLinks() {
     } catch (error) {
         console.error('加载配置失败:', error);
         // 如果配置加载失败，使用默认链接
+        const historyLink = document.getElementById('historyLink');
+        if (historyLink) {
+            historyLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                chrome.tabs.create({ 
+                    url: chrome.runtime.getURL('history/history.html')
+                });
+            });
+        }
+        
+        const favoritesLink = document.getElementById('favoritesLink');
+        if (favoritesLink) {
+            favoritesLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                chrome.tabs.create({ 
+                    url: chrome.runtime.getURL('favorites/favorites.html')
+                });
+            });
+        }
+        
         const feedbackLink = document.getElementById('feedbackLink');
         if (feedbackLink) {
             feedbackLink.addEventListener('click', (e) => {

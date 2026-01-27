@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Favorites</title>
+    <link rel="stylesheet" href="favorites.css">
+</head>
+<body>
+    <div class="favorites-container">
+        <div class="favorites-header">
+            <h1>Favorites</h1>
+            <button id="clearFavoritesBtn" class="clear-btn">Clear All Favorites</button>
+        </div>
+        <div id="favoritesList" class="favorites-list">
+            <!-- 收藏记录将动态加载到这里 -->
+        </div>
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-icon">⭐</div>
+            <div class="empty-text">No favorite record</div>
+        </div>
+    </div>
+    <script src="../config/baseConfig.js"></script>
+    <script src="favorites.js"></script>
+</body>
+</html>

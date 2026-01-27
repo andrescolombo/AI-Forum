@@ -1051,12 +1051,14 @@ function initializeNavigation() {
   });
 }
 
-// 打开历史记录页面
+// 打开历史记录页面（当前标签页跳转）
 function openHistoryPage() {
-  chrome.tabs.create({
-    url: chrome.runtime.getURL('history/history.html'),
-    active: true
-  });
+  window.location.href = chrome.runtime.getURL('history/history.html');
+}
+
+// 打开收藏记录页面（当前标签页跳转）
+function openFavoritesPage() {
+  window.location.href = chrome.runtime.getURL('favorites/favorites.html');
 }
 
 // 页面初始化
@@ -1084,6 +1086,15 @@ document.addEventListener('DOMContentLoaded', () => {
     historyLink.addEventListener('click', (e) => {
       e.preventDefault();
       openHistoryPage();
+    });
+  }
+
+  // 绑定收藏记录链接点击事件
+  const favoritesLink = document.getElementById('favoritesLink');
+  if (favoritesLink) {
+    favoritesLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      openFavoritesPage();
     });
   }
 });
