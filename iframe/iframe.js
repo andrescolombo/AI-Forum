@@ -1630,149 +1630,6 @@ if (settingsIcon && settingsDialog) {
     });
 }
 
-// 历史记录抽屉相关功能
-const historyIcon = document.querySelector('.history-icon');
-const historyDrawer = document.getElementById('historyDrawer');
-const historyDrawerOverlay = document.getElementById('historyDrawerOverlay');
-const historyDrawerCloseBtn = document.getElementById('historyDrawerCloseBtn');
-const historyList = document.getElementById('historyList');
-
-// 打开历史记录抽屉
-async function loadHistoryDrawer() {
-    try {
-        // 从 chrome.storage.local 读取历史记录
-        const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
-        
-        // 渲染历史记录列表
-        renderHistoryList(pkHistory);
-        
-        // 更新底部提示文本
-        await updateHistoryFooter();
-        
-        // 显示抽屉和遮罩层
-        historyDrawer.classList.add('open');
-        historyDrawerOverlay.classList.add('show');
-    } catch (error) {
-        console.error('加载历史记录失败:', error);
-    }
-}
-
-// 更新历史记录抽屉底部提示文本
-async function updateHistoryFooter() {
-    const footer = document.getElementById('historyDrawerFooter');
-    if (!footer) return;
-    
-    let maxHistory = 100; // 默认值
-    try {
-        if (window.AppConfigManager) {
-            const appConfig = await window.AppConfigManager.loadConfig();
-            if (appConfig && appConfig.history && appConfig.history.maxCount) {
-                maxHistory = appConfig.history.maxCount;
-            }
-        }
-    } catch (error) {
-        console.warn('读取历史记录数量配置失败，使用默认值 100:', error);
-    }
-    
-    // 使用国际化文本，支持双语
-    const messageKey = chrome.i18n.getMessage('historyMaxRecordsTip', [maxHistory.toString()]);
-    footer.textContent = messageKey || `只保存最近的${maxHistory}条记录`;
-}
-
-// 渲染历史记录列表
-function renderHistoryList(historyArray) {
-    // 清空历史记录列表容器
-    historyList.innerHTML = '';
-    
-    if (historyArray.length === 0) {
-        historyList.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">暂无搜索历史</div>';
-        return;
-    }
-    
-    // 遍历历史记录数组，为每条记录创建元素
-    historyArray.forEach(historyItem => {
-        const historyItemElement = document.createElement('div');
-        historyItemElement.className = 'history-item';
-        
-        // 检查是否有收藏的 iframe
-        const hasFavorite = historyItem.sites && historyItem.sites.some(site => site.isFavorite === true);
-        
-        // 创建内容容器
-        const contentWrapper = document.createElement('div');
-        contentWrapper.style.display = 'flex';
-        contentWrapper.style.alignItems = 'center';
-        contentWrapper.style.gap = '8px';
-        
-        const queryText = document.createElement('span');
-        queryText.textContent = historyItem.query || '无查询内容';
-        contentWrapper.appendChild(queryText);
-        
-        // 如果有收藏的 iframe，显示收藏图标
-        if (hasFavorite) {
-            const favoriteIndicator = document.createElement('img');
-            favoriteIndicator.src = '../icons/star_saved.png';
-            favoriteIndicator.alt = '已收藏';
-            favoriteIndicator.title = '包含已收藏的 iframe';
-            favoriteIndicator.style.width = '16px';
-            favoriteIndicator.style.height = '16px';
-            favoriteIndicator.style.flexShrink = '0';
-            contentWrapper.appendChild(favoriteIndicator);
-        }
-        
-        historyItemElement.appendChild(contentWrapper);
-        
-        // 添加点击事件
-        historyItemElement.addEventListener('click', () => {
-            handleHistoryItemClick(historyItem);
-        });
-        
-        historyList.appendChild(historyItemElement);
-    });
-}
-
-// 处理历史记录项点击
-async function handleHistoryItemClick(historyItem) {
-    try {
-        // 先更新搜索框值
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.value = historyItem.query || '';
-        }
-        
-        // 更新 URL 参数（在加载 iframes 之前更新，以便 loadHistoryIframes 可以读取正确的 query）
-        const urlParams = new URLSearchParams(window.location.search);
-        if (historyItem.query) {
-            urlParams.set('query', historyItem.query);
-        } else {
-            urlParams.delete('query');
-        }
-        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
-        window.history.replaceState({}, '', newUrl);
-        
-        // 加载历史 iframes
-        await loadHistoryIframes(historyItem.sites);
-        
-        // 关闭抽屉
-        closeHistoryDrawer();
-    } catch (error) {
-        console.error('处理历史记录项点击失败:', error);
-    }
-}
-
-// 关闭历史记录抽屉
-function closeHistoryDrawer() {
-    historyDrawer.classList.remove('open');
-    historyDrawerOverlay.classList.remove('show');
-}
-
-// 历史按钮点击事件：当前标签页跳转到历史记录页面
-if (historyIcon) {
-    historyIcon.addEventListener('click', (e) => {
-        e.stopPropagation();
-        window.location.href = chrome.runtime.getURL('history/history.html');
-    });
-}
-
 // 收藏当前记录的所有 iframe
 async function favoriteAllIframes() {
     try {
@@ -1917,12 +1774,9 @@ async function toggleIframeFavorite(siteName, favoriteBtn) {
 const favoriteIcon = document.querySelector('.favorite-icon');
 if (favoriteIcon) {
     // 设置收藏按钮的国际化标题
-    const favoriteIconContainer = document.querySelector('.favorite-icon-container');
-    if (favoriteIconContainer) {
-        const favoritesTitle = chrome.i18n.getMessage('favoritesTitle');
-        if (favoritesTitle) {
-            favoriteIcon.title = favoritesTitle;
-        }
+    const favoriteAllSitesTitle = chrome.i18n.getMessage('favoriteAllSites');
+    if (favoriteAllSitesTitle) {
+        favoriteIcon.title = favoriteAllSitesTitle;
     }
     
     favoriteIcon.addEventListener('click', async (e) => {
@@ -1931,28 +1785,6 @@ if (favoriteIcon) {
         await favoriteAllIframes();
     });
 }
-
-// 遮罩层点击事件
-if (historyDrawerOverlay) {
-    historyDrawerOverlay.addEventListener('click', () => {
-        closeHistoryDrawer();
-    });
-}
-
-// 关闭按钮点击事件
-if (historyDrawerCloseBtn) {
-    historyDrawerCloseBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        closeHistoryDrawer();
-    });
-}
-
-// ESC 键监听
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && historyDrawer.classList.contains('open')) {
-        closeHistoryDrawer();
-    }
-});
 
 // 初始化国际化
 function initializeI18n() {
@@ -1966,8 +1798,9 @@ function initializeI18n() {
                 element.tagName.toLowerCase() === 'textarea') {
                 // 对于输入框和文本域，设置 placeholder
                 element.placeholder = message;
-            } else if (element.tagName.toLowerCase() === 'button') {
-                // 对于按钮，设置 title 属性
+            } else if (element.tagName.toLowerCase() === 'button' || 
+                       element.tagName.toLowerCase() === 'img') {
+                // 对于按钮和图片，设置 title 属性
                 element.title = message;
             } else {
                 // 对于其他元素，设置文本内容

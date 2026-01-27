@@ -279,6 +279,13 @@
   "favoritesLink": {
     "message": "Favorites"
   },
+  "settingsLink": {
+    "message": "Settings"
+  },
+  "favoriteAllSites": {
+    "message": "Favorite All Sites",
+    "description": "Tooltip for the favorite all sites button"
+  },
   "historyMaxRecordsTip": {
     "message": "Only the latest $COUNT$ records are saved",
     "placeholders": {
@@ -343,5 +350,11 @@
   },
   "noSitesSelected": {
     "message": "Please select at least one site"
+  },
+  "automationNotice": {
+    "message": "If websites are updated, the corresponding automated query functionality may become unavailable. We apologize for any inconvenience. If you discover any issues, please contact us for updates"
+  },
+  "reviewLink": {
+    "message": "⭐ Rate 5 Stars"
   }
 } 

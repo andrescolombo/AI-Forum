@@ -274,6 +274,13 @@
   "favoritesLink": {
     "message": "收藏记录"
   },
+  "settingsLink": {
+    "message": "设置"
+  },
+  "favoriteAllSites": {
+    "message": "收藏所有站点",
+    "description": "收藏所有站点按钮的提示文本"
+  },
   "historyMaxRecordsTip": {
     "message": "只保存最近的$COUNT$条记录",
     "placeholders": {
@@ -338,5 +345,11 @@
   },
   "noSitesSelected": {
     "message": "请至少选择一个站点"
+  },
+  "automationNotice": {
+    "message": "如果网站更新，对应的自动化提问功能会失效，敬请谅解。发现失效，可以与我联系更新"
+  },
+  "reviewLink": {
+    "message": "⭐ 五星好评"
   }
 } 

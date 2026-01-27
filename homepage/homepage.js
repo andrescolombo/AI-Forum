@@ -585,6 +585,17 @@ async function initializeActionLinks() {
             });
         }
         
+        // 设置链接
+        const settingsLink = document.getElementById('settingsLink');
+        if (settingsLink) {
+            settingsLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                trackEvent('homepage_settings_click');
+                // 在当前页面跳转到设置页面
+                window.location.href = chrome.runtime.getURL('options/options.html');
+            });
+        }
+        
         // 用户反馈链接
         const feedbackLink = document.getElementById('feedbackLink');
         if (feedbackLink) {
@@ -597,6 +608,21 @@ async function initializeActionLinks() {
                     has_feedback_link: Boolean(externalLinks.feedbackSurvey)
                 });
                 chrome.tabs.create({ url: feedbackUrl });
+            });
+        }
+        
+        // 五星好评链接
+        const reviewLink = document.getElementById('reviewLink');
+        if (reviewLink) {
+            reviewLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                // 从配置中获取评价链接
+                const reviewUrl = externalLinks.reviewLink || 
+                    'https://chromewebstore.google.com/detail/ai-compare-oneclick-to-co/dkhpgbbhlnmjbkihoeniojpkggkabbbl/reviews';
+                trackEvent('homepage_review_click', {
+                    has_review_link: Boolean(externalLinks.reviewLink)
+                });
+                chrome.tabs.create({ url: reviewUrl });
             });
         }
     } catch (error) {
@@ -622,12 +648,31 @@ async function initializeActionLinks() {
             });
         }
         
+        const settingsLink = document.getElementById('settingsLink');
+        if (settingsLink) {
+            settingsLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                // 在当前页面跳转到设置页面
+                window.location.href = chrome.runtime.getURL('options/options.html');
+            });
+        }
+        
         const feedbackLink = document.getElementById('feedbackLink');
         if (feedbackLink) {
             feedbackLink.addEventListener('click', (e) => {
                 e.preventDefault();
                 chrome.tabs.create({ 
                     url: 'https://wenjuan.feishu.cn/m/cfm?t=sTFPGe4oetOi-9m3a' 
+                });
+            });
+        }
+        
+        const reviewLink = document.getElementById('reviewLink');
+        if (reviewLink) {
+            reviewLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                chrome.tabs.create({ 
+                    url: 'https://chromewebstore.google.com/detail/ai-compare-oneclick-to-co/dkhpgbbhlnmjbkihoeniojpkggkabbbl/reviews'
                 });
             });
         }

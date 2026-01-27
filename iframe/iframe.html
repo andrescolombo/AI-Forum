@@ -121,12 +121,8 @@
             
             </div>
 
-            <div class="history-icon-container">
-                <img src="../icons/history.png" class="history-icon" title="History">
-            </div>
-
             <div class="favorite-icon-container">
-                <img src="../icons/star_unsaved.png" class="favorite-icon" title="Favorites">
+                <img src="../icons/star_unsaved.png" class="favorite-icon" data-i18n="favoriteAllSites" title="Favorite All Sites">
             </div>
         </div> <!-- 结束 search-bar-right-buttons 容器 -->
     </div>
@@ -135,25 +131,6 @@
     </div>
     <div id="queryList" style="display: none;">
         <!-- 收藏的 query 列表将动态添加到这里 -->
-    </div>
-    
-    <!-- 历史记录抽屉遮罩层 -->
-    <div class="history-drawer-overlay" id="historyDrawerOverlay"></div>
-    
-    <!-- 历史记录抽屉 -->
-    <div class="history-drawer" id="historyDrawer">
-        <div class="history-drawer-header">
-            <h3 data-i18n="historyTitle">History</h3>
-            <button class="history-drawer-close-btn" id="historyDrawerCloseBtn">
-                <img src="../icons/close.png" alt="关闭" class="close-icon">
-            </button>
-        </div>
-        <div class="history-list" id="historyList">
-            <!-- 历史记录列表将通过 JavaScript 动态添加 -->
-        </div>
-        <div class="history-drawer-footer" id="historyDrawerFooter">
-            <!-- 提示文本将通过 JavaScript 动态更新 -->
-        </div>
     </div>
     <script src="../config/baseConfig.js"></script>
     <script src="../config/analytics.js"></script>
