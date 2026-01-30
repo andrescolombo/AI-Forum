@@ -305,7 +305,7 @@
     {
       "name": "Claude",
       "url": "https://claude.ai/chat",
-      "enabled": true,
+      "enabled": false,
       "supportUrlQuery": false,
       "region": "US",
       "hidden": false,
