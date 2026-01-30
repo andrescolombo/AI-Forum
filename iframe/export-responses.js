@@ -226,7 +226,12 @@ function initializeExportModal(modal) {
       
       // 执行导出
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const filename = `ai-responses-${timestamp}.${selectedFormat === 'txt' ? 'txt' : selectedFormat}`;
+      const fileExt =
+        selectedFormat === 'markdown' ? 'md' :
+        selectedFormat === 'txt' ? 'txt' :
+        selectedFormat === 'html' ? 'html' :
+        selectedFormat;
+      const filename = `ai-responses-${timestamp}.${fileExt}`;
       const mimeType = selectedFormat === 'html' ? 'text/html' : 
                       selectedFormat === 'txt' ? 'text/plain' : 'text/markdown';
       

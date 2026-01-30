@@ -200,6 +200,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     if (details.reason === 'install') {
       console.log('首次安装，初始化用户设置');
       
+      // 标记为新用户（用于显示 pin 引导）
+      await chrome.storage.local.set({ 
+        pinGuideShown: false 
+      });
+      console.log('已标记为新用户（pinGuideShown: false）');
+      
       // 处理 favoriteSites 数据
       if (!favoriteSites || !favoriteSites.length) {
         const defaultFavoriteSites = await self.AppConfigManager.getDefaultFavoriteSites();
@@ -308,6 +314,21 @@ chrome.declarativeNetRequest.updateSessionRules({
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "searchWithMultiAI" && info.selectionText) {
     openSearchTabs(info.selectionText);
+  } else if (info.menuItemId === "openOptions") {
+    // 打开选项页面
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('options/options.html')
+    });
+  } else if (info.menuItemId === "openHistory") {
+    // 打开历史记录页面
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('history/history.html')
+    });
+  } else if (info.menuItemId === "openFavorites") {
+    // 打开收藏记录页面
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('favorites/favorites.html')
+    });
   }
 });
 
@@ -368,31 +389,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const windowId = sender.tab.windowId;
     console.log('🔍 收到TOGGLE_SIDE_PANEL消息，windowId:', windowId);
     
-    // 先检查实际的侧边栏标签页是否存在
-    chrome.tabs.query({ windowId: windowId }, (tabs) => {
-      console.log('🔍 查询到的标签页数量:', tabs.length);
-      const sidePanelTab = tabs.find(tab => tab.url && tab.url.includes('iframe/iframe.html'));
-      const actualIsOpen = !!sidePanelTab;
-      const recordedIsOpen = sidePanelOpenState.get(windowId) || false;
-      
-      console.log('🔍 侧边栏状态检查:');
-      console.log('  - 实际状态:', actualIsOpen);
-      console.log('  - 记录状态:', recordedIsOpen);
-      console.log('  - windowId:', windowId);
-      console.log('  - 找到的侧边栏标签页:', sidePanelTab);
-      
-      // 如果状态不同步，以实际状态为准
-      if (actualIsOpen !== recordedIsOpen) {
-        console.log('🔍 侧边栏状态不同步，修正为实际状态:', actualIsOpen);
-        sidePanelOpenState.set(windowId, actualIsOpen);
+    // 在打开侧边栏之前，设置路径并添加 side_panel 参数
+    // 注意：setOptions 必须在用户手势响应中同步调用，且不能包含 windowId
+    if (chrome.sidePanel && chrome.sidePanel.setOptions) {
+      try {
+        chrome.sidePanel.setOptions({
+          path: 'homepage/homepage.html?side_panel=true',
+          enabled: true
+        });
+        console.log('✅ 已设置侧边栏路径（带 side_panel 参数）');
+      } catch (setOptionsError) {
+        console.warn('⚠️ 设置侧边栏路径失败，使用默认路径:', setOptionsError);
       }
-      
-      // 执行切换操作
-      console.log('🔍 开始执行侧边栏切换操作...');
-      handleSidePanelToggle(windowId, actualIsOpen);
-    });
+    }
     
-    // 立即返回成功响应，不等待实际操作完成
+    // 同步调用 sidePanel.open()，保持用户手势上下文
+    if (chrome.sidePanel && chrome.sidePanel.open) {
+      chrome.sidePanel.open({ windowId }).then(() => {
+        sidePanelOpenState.set(windowId, true);
+        console.log('✅ 侧边栏已打开');
+      }).catch((error) => {
+        console.error('❌ 打开侧边栏失败:', error);
+        sidePanelOpenState.set(windowId, false);
+      });
+    } else {
+      console.error('❌ 当前浏览器不支持 sidePanel API');
+    }
+    
+    // 立即返回成功响应
     sendResponse({ success: true });
     return true; // 保持消息通道开放
   }
@@ -649,85 +673,6 @@ async function openSearchTabs(query, checkedSites = null) {
               });
           }
       });
-
-  }
-
-  
-
-  
-  // 过滤出启用但不支持 iframe 的站点
-  const tabSites = result.filter(site => 
-    site.supportIframe !== true
-  );
-  console.log('启用的非 iframe 站点:', tabSites);
-  
-  const allTabs = await chrome.tabs.query({});
-
-  for (const site of tabSites) {
-    if (!site.url) {
-      console.error('站点配置缺少 URL:', site);
-      continue;
-    }
-
-    const url = site.supportUrlQuery 
-      ? site.url.replace('{query}', encodeURIComponent(query))
-      : site.url;
-      
-    console.log('处理站点:', {
-      名称: site.name,
-      URL: url,
-      是否支持URL拼接查询: site.supportUrlQuery
-    });
-
-    const siteDomain = getBaseDomain(url);
-    const existingTab = findExistingTab(allTabs, siteDomain);
-
-    if (existingTab) {
-      console.log('找到已存在的标签页:', existingTab.url);
-      
-      if (site.supportUrlQuery) {
-        // URL 方式的站点
-        await chrome.tabs.update(existingTab.id, { url, active: true });
-      // 将标签页移动到最右侧
-        const rightmostIndex = Math.max(...allTabs.map(tab => tab.index)) + 1;
-        await chrome.tabs.move(existingTab.id, {index: rightmostIndex});
-      } else {
-        // 需要脚本处理的站点
-        console.log('需要处理的站点tab:', {
-          站点URL: url,
-          siteDomain: siteDomain,
-          标签页标题: existingTab.title,
-          标签页URL: existingTab.url
-        });
-        const siteHandler = await getHandlerForUrl(siteDomain);
-        if (siteHandler && siteHandler.searchHandler) {
-          console.log('执行站点处理函数', siteHandler.name);
-          console.log('标签页ID:', existingTab.id);
-          await executeSiteHandler(existingTab.id, query, siteHandler);
-          console.log('执行站点处理函数完成');
-        } else {
-          console.warn('未找到对应的处理函数');
-        }
-      }
-    } else {
-      console.log('创建新标签页:', url);
-      const tab = await chrome.tabs.create({ url, active: true });
-      
-      if (!site.supportUrlQuery) {
-        // 等待页面加载完成后执行处理函数
-        chrome.tabs.onUpdated.addListener(async function listener(tabId, info) {
-          if (tabId === tab.id && info.status === 'complete') {
-            console.log('标签页URL:', tab.url);
-            console.log('站点URL:', url);
-            const siteHandler = await getHandlerForUrl(url);
-            if (siteHandler && siteHandler.searchHandler) {
-              executeSiteHandler(tab.id, query, siteHandler);
-            }
-            chrome.tabs.onUpdated.removeListener(listener);
-          }
-        });
-      }
-    }
   }
 }
 
@@ -757,9 +702,9 @@ function findExistingTab(tabs, targetDomain) {
 
 // 处理扩展图标点击事件
 chrome.action.onClicked.addListener((tab) => {
-  // 打开新标签页显示 iframe.html
+  // 打开新标签页显示精简首页 homepage.html
   chrome.tabs.create({
-    url: chrome.runtime.getURL('iframe/iframe.html')
+    url: chrome.runtime.getURL('homepage/homepage.html')
   });
 });
 
@@ -780,6 +725,18 @@ self.addEventListener('error', (error) => {
     console.error('Service Worker 错误:', error);
 });
 
+// 捕获未处理的 Promise rejection
+self.addEventListener('unhandledrejection', (event) => {
+    // 忽略 "No SW" 错误，这是 Chrome 扩展的正常行为
+    if (event.reason && event.reason.message && event.reason.message.includes('No SW')) {
+        // 静默处理，不输出错误
+        event.preventDefault();
+        return;
+    }
+    console.error('未处理的 Promise rejection:', event.reason);
+    event.preventDefault(); // 防止错误显示在控制台
+});
+
 
 // 防抖变量，避免短时间内多次调用
 let contextMenuTimeout = null;
@@ -794,27 +751,44 @@ async function createContextMenu() {
   // 设置防抖延迟
   contextMenuTimeout = setTimeout(async () => {
     try {
+      // 先移除所有现有菜单，然后创建新菜单
+      // 这样可以避免重复创建的问题
+      await chrome.contextMenus.removeAll();
+      
+      // 创建扩展图标上的右键菜单（选项、历史记录、收藏记录）
+      chrome.contextMenus.create({
+        id: "openOptions",
+        title: chrome.i18n.getMessage("settingsLink") || "选项",
+        contexts: ["action"]  // 在扩展图标上右键时显示
+      });
+      
+      chrome.contextMenus.create({
+        id: "openHistory",
+        title: chrome.i18n.getMessage("historyLink") || "历史记录",
+        contexts: ["action"]  // 在扩展图标上右键时显示
+      });
+      
+      chrome.contextMenus.create({
+        id: "openFavorites",
+        title: chrome.i18n.getMessage("favoritesLink") || "收藏记录",
+        contexts: ["action"]  // 在扩展图标上右键时显示
+      });
+      
       // 获取配置
       const { buttonConfig } = await chrome.storage.sync.get('buttonConfig');
       
-      // 检查是否启用右键菜单
+      // 检查是否启用页面右键菜单（选中文本时的菜单）
       if (buttonConfig && buttonConfig.contextMenu) {
-        // 先移除所有现有菜单，然后创建新菜单
-        // 这样可以避免重复创建的问题
-        await chrome.contextMenus.removeAll();
-        
-        // 创建新菜单
+        // 创建页面上的右键菜单（选中文本时显示）
         chrome.contextMenus.create({
           id: "searchWithMultiAI",
           title: chrome.i18n.getMessage("searchWithMultiAI"),
           contexts: ["selection"]  // 只在选中文本时显示
         });
-        console.log('右键菜单已创建');
-      } else {
-        // 如果未启用，确保移除菜单
-        await chrome.contextMenus.removeAll();
-        console.log('右键菜单已移除');
+        console.log('页面右键菜单已创建');
       }
+      
+      console.log('扩展图标右键菜单已创建');
     } catch (error) {
       console.error('创建右键菜单失败:', error);
     }
@@ -846,117 +820,7 @@ function resetSidePanelState(windowId) {
   sidePanelOpenState.set(windowId, false);
 }
 
-// 处理侧边栏切换逻辑
-async function handleSidePanelToggle(windowId, isCurrentlyOpen) {
-  console.log('🔍 handleSidePanelToggle 被调用:');
-  console.log('  - windowId:', windowId);
-  console.log('  - isCurrentlyOpen:', isCurrentlyOpen);
-  
-  if (isCurrentlyOpen) {
-    // 如果侧边栏已经打开，则关闭它
-    console.log('🔍 侧边栏已打开，准备关闭...');
-    
-    // 直接关闭侧边栏标签页
-    chrome.tabs.query({ windowId: windowId }, (tabs) => {
-      const sidePanelTab = tabs.find(tab => tab.url && tab.url.includes('iframe/iframe.html'));
-      if (sidePanelTab) {
-        chrome.tabs.remove(sidePanelTab.id);
-        sidePanelOpenState.set(windowId, false);
-        console.log('✅ 已关闭侧边栏标签页');
-      } else {
-        sidePanelOpenState.set(windowId, false);
-        console.log('✅ 侧边栏已关闭');
-      }
-    });
-  } else {
-    // 如果侧边栏未打开，则打开它
-    console.log('🔍 侧边栏未打开，准备打开...');
-    
-    // 先检查是否支持 sidePanel API
-    console.log('🔍 检查 sidePanel API 支持:');
-    console.log('  - chrome.sidePanel 存在:', !!chrome.sidePanel);
-    console.log('  - chrome.sidePanel.open 存在:', !!(chrome.sidePanel && chrome.sidePanel.open));
-    
-    if (!chrome.sidePanel || !chrome.sidePanel.open) {
-      console.error('❌ 当前浏览器不支持 sidePanel API');
-      sidePanelOpenState.set(windowId, false);
-      return;
-    }
-    
-    // 调用 sidePanel.open() 并正确处理 Promise
-    console.log('🔍 调用 chrome.sidePanel.open({ windowId:', windowId, '})');
-    
-    // 使用正确的API调用方式
-    try {
-      await chrome.sidePanel.open({ windowId: windowId });
-      // 只有在成功打开后才设置状态为 true
-      sidePanelOpenState.set(windowId, true);
-      console.log('✅ 侧边栏已成功打开');
-    } catch (error) {
-      // 打开失败时确保状态为 false
-      sidePanelOpenState.set(windowId, false);
-      console.error('❌ 打开侧边栏失败:', error);
-      
-      // 提供更详细的错误信息
-      if (error.message) {
-        console.error('❌ 错误详情:', error.message);
-      }
-      if (error.name) {
-        console.error('❌ 错误名称:', error.name);
-      }
-      
-      // 尝试备用方案：直接打开新标签页
-      console.log('🔄 尝试备用方案：打开新标签页');
-      try {
-        await chrome.tabs.create({
-          url: chrome.runtime.getURL('iframe/iframe.html'),
-          active: true
-        });
-        console.log('✅ 已通过新标签页打开侧边栏内容');
-      } catch (tabError) {
-        console.error('❌ 备用方案也失败:', tabError);
-      }
-    }
-  }
-}
 
-// 监听标签页创建事件，同步侧边栏状态
-chrome.tabs.onCreated.addListener((tab) => {
-  // 检查是否是侧边栏标签页
-  if (tab.url && tab.url.includes('iframe/iframe.html')) {
-    console.log('检测到侧边栏标签页创建:', tab.id, 'windowId:', tab.windowId);
-    sidePanelOpenState.set(tab.windowId, true);
-  }
-});
-
-// 监听标签页更新事件，同步侧边栏状态
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  // 检查是否是侧边栏标签页且状态变为完成
-  if (changeInfo.status === 'complete' && tab.url && tab.url.includes('iframe/iframe.html')) {
-    console.log('侧边栏标签页加载完成:', tabId, 'windowId:', tab.windowId);
-    sidePanelOpenState.set(tab.windowId, true);
-  }
-});
-
-// 监听标签页移除事件，同步侧边栏状态
-chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
-  // 如果是窗口关闭，清理整个窗口的状态
-  if (removeInfo.isWindowClosing) {
-    console.log('窗口关闭，清理侧边栏状态:', removeInfo.windowId);
-    sidePanelOpenState.delete(removeInfo.windowId);
-  } else {
-    // 检查是否是侧边栏标签页被关闭
-    chrome.tabs.get(tabId).then(tab => {
-      if (tab.url && tab.url.includes('iframe/iframe.html')) {
-        console.log('侧边栏标签页被关闭:', tabId, 'windowId:', tab.windowId);
-        sidePanelOpenState.set(tab.windowId, false);
-      }
-    }).catch(error => {
-      // 标签页可能已经被移除，忽略错误
-      console.log('无法获取已移除标签页信息，忽略错误');
-    });
-  }
-});
 
 // Omnibox 事件处理
 chrome.omnibox.onInputChanged.addListener((text, suggest) => {

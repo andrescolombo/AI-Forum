@@ -1,6 +1,7 @@
 
 // 避免重复声明的检查
-if (typeof window !== 'undefined' && window.BaseConfigLoaded) {
+if ((typeof window !== 'undefined' && window.BaseConfigLoaded) || 
+    (typeof self !== 'undefined' && self.BaseConfigLoaded)) {
   console.log('baseConfig.js 已经加载，跳过重复声明');
 } else {
 
@@ -9,7 +10,9 @@ const DEV_CONFIG = {
   IS_PRODUCTION: true,  // 开发时设为 false，发布时设为 true
   SKIP_REMOTE_CONFIG: true,  // 开发时跳过远程配置，直接使用本地文件
   ENABLE_CONFIG_CACHE: false, // 开发时禁用配置缓存，确保修改立即生效
-  FORCE_LOCAL_CONFIG: true   // 开发时强制使用本地配置文件
+  FORCE_LOCAL_CONFIG: true,   // 开发时强制使用本地配置文件
+  ENABLE_SITE_BUTTON: false  // site-button 是否生效的开关
+
 };
 
 // 生产环境 console 重写（仅在 production 模式下）
@@ -33,131 +36,16 @@ const AppConfigManager = {
     
     try {
       const response = await fetch(chrome.runtime.getURL('config/appConfig.json'));
-      if (response.ok) {
-        this._config = await response.json();
-        console.log('应用配置加载成功');
-        return this._config;
+      if (!response.ok) {
+        throw new Error(`加载配置文件失败: HTTP ${response.status}`);
       }
+      this._config = await response.json();
+      console.log('应用配置加载成功');
+      return this._config;
     } catch (error) {
       console.error('加载应用配置失败:', error);
+      throw new Error(`无法加载应用配置文件: ${error.message}`);
     }
-    
-    // 如果加载失败，返回默认配置
-    this._config = {
-      defaultFavoriteSites: [{ name: "ChatGPT" }],
-      defaultModes: { iframe: false },
-      buttonConfig: {
-        floatButton: true,
-        selectionSearch: true,
-        contextMenu: true,
-        searchEngine: true
-      },
-      externalLinks: {
-        uninstallSurvey: 'https://wenjuan.feishu.cn/m?t=sxcO29Fz913i-1ad4',
-        feedbackSurvey: 'https://wenjuan.feishu.cn/m/cfm?t=sTFPGe4oetOi-9m3a'
-      },
-      supportedFileTypes: {
-        categories: {
-          general: {
-            name: "通用文件类型",
-            types: ["Files", "application/octet-stream"]
-          },
-          images: {
-            name: "图片格式",
-            types: ["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml", "image/bmp", "image/tiff", "image/ico", "image/avif"]
-          },
-          documents: {
-            name: "文档格式",
-            types: [
-              "application/pdf",
-              "application/msword",
-              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-              "application/vnd.ms-excel", 
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-              "application/vnd.ms-powerpoint",
-              "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-              "application/vnd.oasis.opendocument.text",
-              "application/vnd.oasis.opendocument.spreadsheet", 
-              "application/vnd.oasis.opendocument.presentation",
-              "application/rtf",
-              "text/plain",
-              "text/csv"
-            ]
-          },
-          audio: {
-            name: "音频格式", 
-            types: ["audio/mpeg", "audio/wav", "audio/ogg", "audio/flac", "audio/m4a"]
-          },
-          video: {
-            name: "视频格式",
-            types: ["video/mp4", "video/avi", "video/mov", "video/wmv", "video/webm"]
-          },
-          code: {
-            name: "代码文件",
-            types: ["text/javascript", "text/css", "text/html", "text/xml", "application/json"]
-          },
-          archives: {
-            name: "压缩文件",
-            types: ["application/zip", "application/x-rar-compressed", "application/x-7z-compressed", "application/gzip", "application/x-tar"]
-          }
-        },
-        mimeToExtension: {
-          mappings: {
-            "Files": "file",
-            "application/octet-stream": "bin",
-            // 图片类型
-            "image/png": "png",
-            "image/jpeg": "jpg", 
-            "image/gif": "gif",
-            "image/webp": "webp",
-            "image/svg+xml": "svg",
-            "image/bmp": "bmp",
-            "image/tiff": "tiff",
-            "image/ico": "ico",
-            "image/avif": "avif",
-            // 文档类型
-            "application/pdf": "pdf",
-            "application/msword": "doc",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
-            "application/vnd.ms-excel": "xls",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx", 
-            "application/vnd.ms-powerpoint": "ppt",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
-            "application/vnd.oasis.opendocument.text": "odt",
-            "application/vnd.oasis.opendocument.spreadsheet": "ods",
-            "application/vnd.oasis.opendocument.presentation": "odp",
-            "application/rtf": "rtf",
-            "text/plain": "txt",
-            "text/csv": "csv",
-            // 音频类型
-            "audio/mpeg": "mp3",
-            "audio/wav": "wav", 
-            "audio/ogg": "ogg",
-            "audio/flac": "flac",
-            "audio/m4a": "m4a",
-            // 视频类型
-            "video/mp4": "mp4",
-            "video/avi": "avi",
-            "video/mov": "mov", 
-            "video/wmv": "wmv",
-            "video/webm": "webm",
-            // 代码类型
-            "text/javascript": "js",
-            "text/css": "css",
-            "text/html": "html",
-            "text/xml": "xml", 
-            "application/json": "json",
-            // 压缩文件
-            "application/zip": "zip",
-            "application/x-rar-compressed": "rar",
-            "application/x-7z-compressed": "7z",
-            "application/gzip": "gz",
-            "application/x-tar": "tar"
-          }
-        }
-      }
-    };
-    return this._config;
   },
   
   // 获取默认收藏站点
@@ -524,25 +412,8 @@ if (typeof window === 'undefined') {
   // 动态获取站点配置
   self.getDefaultSites = async function() {
     try {
-      // 开发环境：跳过远程配置，直接使用本地文件
-      if (!DEV_CONFIG.IS_PRODUCTION && DEV_CONFIG.SKIP_REMOTE_CONFIG) {
-        console.log('🚀 开发模式：跳过远程配置，直接加载本地文件');
-        try {
-          const response = await fetch(chrome.runtime.getURL('config/siteHandlers.json'));
-          if (response.ok) {
-            const localConfig = await response.json();
-            if (localConfig.sites && localConfig.sites.length > 0) {
-              console.log('✅ 开发模式：从本地文件加载站点配置成功');
-              return localConfig.sites;
-            }
-          }
-        } catch (error) {
-          console.error('❌ 开发模式：从本地文件加载配置失败:', error);
-        }
-        return [];
-      }
       
-      // 生产环境：从 remoteSiteHandlers 读取基础配置
+      //1 从 remoteSiteHandlers 读取基础配置
       console.log('尝试从 remoteSiteHandlers 读取站点配置...');
       let baseSites = [];
       try {
@@ -550,6 +421,7 @@ if (typeof window === 'undefined') {
         if (result.remoteSiteHandlers && result.remoteSiteHandlers.sites && result.remoteSiteHandlers.sites.length > 0) {
           baseSites = result.remoteSiteHandlers.sites;
           console.log('从 remoteSiteHandlers 加载站点配置成功');
+          console.log('remoteSiteHandlers 加载的站点配置:', baseSites.map(site => ({ name: site.name, enabled: site.enabled })));
         }
       } catch (error) {
         console.error('从 remoteSiteHandlers 读取配置失败:', error);
@@ -561,6 +433,7 @@ if (typeof window === 'undefined') {
         const { sites: userSiteSettings = {} } = await chrome.storage.sync.get('sites');
         userSettings = userSiteSettings;
         console.log('从 chrome.storage.sync 加载用户设置成功');
+        console.log('chrome.storage.sync 加载的用户设置:', Object.keys(userSettings).map(name => ({ name, enabled: userSettings[name]?.enabled })));
       } catch (error) {
         console.error('从 chrome.storage.sync 读取用户设置失败:', error);
       }
@@ -584,6 +457,7 @@ if (typeof window === 'undefined') {
         });
         
         console.log('合并配置成功，站点数量:', mergedSites.length);
+        console.log('合并配置成功，站点配置:', mergedSites.map(site => ({ name: site.name, enabled: site.enabled })));
         return mergedSites;
       }
       
@@ -638,23 +512,6 @@ else {
   // 动态获取站点配置
   window.getDefaultSites = async function() {
     try {
-      // 开发环境：跳过远程配置，直接使用本地文件
-      if (!DEV_CONFIG.IS_PRODUCTION && DEV_CONFIG.SKIP_REMOTE_CONFIG) {
-        console.log('🚀 开发模式：跳过远程配置，直接加载本地文件');
-        try {
-          const response = await fetch(chrome.runtime.getURL('config/siteHandlers.json'));
-          if (response.ok) {
-            const localConfig = await response.json();
-            if (localConfig.sites && localConfig.sites.length > 0) {
-              console.log('✅ 开发模式：从本地文件加载站点配置成功');
-              return localConfig.sites;
-            }
-          }
-        } catch (error) {
-          console.error('❌ 开发模式：从本地文件加载配置失败:', error);
-        }
-        return [];
-      }
       
       // 生产环境：从 remoteSiteHandlers 读取基础配置
       let baseSites = [];
@@ -737,12 +594,20 @@ else {
       isProduction: DEV_CONFIG.IS_PRODUCTION,
       skipRemoteConfig: DEV_CONFIG.SKIP_REMOTE_CONFIG,
       enableConfigCache: DEV_CONFIG.ENABLE_CONFIG_CACHE,
-      forceLocalConfig: DEV_CONFIG.FORCE_LOCAL_CONFIG
+      forceLocalConfig: DEV_CONFIG.FORCE_LOCAL_CONFIG,
+      enableSiteButton: DEV_CONFIG.ENABLE_SITE_BUTTON
     };
   };
   
+  // 暴露 ENABLE_SITE_BUTTON 配置到 window 对象
+  window.ENABLE_SITE_BUTTON = DEV_CONFIG.ENABLE_SITE_BUTTON;
+  
   // 标记配置已加载，避免重复声明
-  window.BaseConfigLoaded = true;
+  if (typeof window !== 'undefined') {
+    window.BaseConfigLoaded = true;
+  } else if (typeof self !== 'undefined') {
+    self.BaseConfigLoaded = true;
+  }
 }
 
 } // 结束重复声明检查的 else 块

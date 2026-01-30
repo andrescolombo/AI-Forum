@@ -1,6 +1,12 @@
 
 console.log('🎯 inject.js 脚本已加载');
 
+// 每个 iframe（每个注入实例）独立保存本次 PK 的历史上下文
+let __aiCompareHistoryContext = {
+  historyId: null,
+  siteName: null
+};
+
 // 动态检查是否在 AI 站点中运行
 async function isAISite() {
   try {
@@ -369,10 +375,27 @@ async function executeClick(step) {
   const selectors = Array.isArray(step.selector) ? step.selector : [step.selector];
   
   for (const selector of selectors) {
-    element = document.querySelector(selector);
-    if (element) {
-      foundSelector = selector;
-      break;
+    // 如果选择器是特殊格式 "text:内容"，则通过文本内容查找
+    if (selector.startsWith('text:')) {
+      const textToFind = selector.substring(5);
+      // 查找所有按钮，匹配文本内容
+      const buttons = document.querySelectorAll('button');
+      for (const btn of buttons) {
+        const text = btn.textContent || btn.innerText || btn.getAttribute('aria-label') || '';
+        if (text.toLowerCase().includes(textToFind.toLowerCase())) {
+          element = btn;
+          foundSelector = selector;
+          break;
+        }
+      }
+      if (element) break;
+    } else {
+      // 标准 CSS 选择器
+      element = document.querySelector(selector);
+      if (element) {
+        foundSelector = selector;
+        break;
+      }
     }
   }
   
@@ -427,20 +450,40 @@ async function executeFocus(step) {
   // 支持多个选择器
   const selectors = Array.isArray(step.selector) ? step.selector : [step.selector];
   
-  for (const selector of selectors) {
-    element = document.querySelector(selector);
-    if (element) {
-      foundSelector = selector;
-      break;
+  // 如果指定了重试机制，使用重试逻辑
+  const maxAttempts = step.maxAttempts || (step.waitForElement ? 5 : 1);
+  const retryInterval = step.retryInterval || 200;
+  let attempts = 0;
+  
+  const tryFocus = async () => {
+    // 尝试查找元素
+    for (const selector of selectors) {
+      element = document.querySelector(selector);
+      if (element) {
+        foundSelector = selector;
+        break;
+      }
     }
-  }
+    
+    if (element) {
+      // 元素找到了，执行聚焦
+      element.focus();
+      console.log('聚焦元素:', foundSelector);
+      return;
+    }
+    
+    // 元素未找到，如果允许重试则重试
+    attempts++;
+    if (attempts < maxAttempts && (step.waitForElement || step.maxAttempts)) {
+      console.log(`元素未找到，${retryInterval}ms后重试 (${attempts}/${maxAttempts}): ${selectors.join(', ')}`);
+      await new Promise(resolve => setTimeout(resolve, retryInterval));
+      return tryFocus();
+    } else {
+      throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
+    }
+  };
   
-  if (!element) {
-    throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
-  }
-  
-  element.focus();
-  console.log('聚焦元素:', foundSelector);
+  await tryFocus();
 }
 
 // 执行设置值操作
@@ -451,33 +494,317 @@ async function executeSetValue(step, query) {
   // 支持多个选择器
   const selectors = Array.isArray(step.selector) ? step.selector : [step.selector];
   
-  for (const selector of selectors) {
-    element = document.querySelector(selector);
-    if (element) {
-      foundSelector = selector;
-      break;
-    }
-  }
+  // 如果指定了重试机制，使用重试逻辑
+  const maxAttempts = step.maxAttempts || (step.waitForElement ? 5 : 1);
+  const retryInterval = step.retryInterval || 200;
+  let attempts = 0;
   
-  if (!element) {
-    throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
-  }
+  const trySetValue = async () => {
+    // 尝试查找元素
+    for (const selector of selectors) {
+      element = document.querySelector(selector);
+      if (element) {
+        foundSelector = selector;
+        break;
+      }
+    }
+    
+    if (!element) {
+      // 元素未找到，如果允许重试则重试
+      attempts++;
+      if (attempts < maxAttempts && (step.waitForElement || step.maxAttempts)) {
+        console.log(`元素未找到，${retryInterval}ms后重试 (${attempts}/${maxAttempts}): ${selectors.join(', ')}`);
+        await new Promise(resolve => setTimeout(resolve, retryInterval));
+        return trySetValue();
+      } else {
+        throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
+      }
+    }
+    
+    // 元素找到，继续执行设置值
+    return element;
+  };
+  
+  element = await trySetValue();
 
   if (step.inputType === 'contenteditable') {
-    // 处理 contenteditable 元素
-    const pElement = element.querySelector('p');
-    if (pElement) {
-      pElement.innerText = query;
+    // 检查是否是 Lexical 编辑器（通过 data-lexical-editor 属性）
+    const isLexicalEditor = element.hasAttribute('data-lexical-editor') || 
+                           element.getAttribute('data-lexical-editor') === 'true';
+    
+    if (isLexicalEditor) {
+      // 处理 Lexical 编辑器：尝试多种方法更新内容
+      console.log('检测到 Lexical 编辑器，尝试更新内容');
+      
+      // 方法1: 尝试通过 Lexical 的内部 API 更新
+      let updatedViaAPI = false;
+      try {
+        // Lexical 编辑器通常会在元素上存储编辑器实例
+        const editorKey = Object.keys(element).find(key => 
+          key.includes('__lexical') || key.includes('lexical') || key.includes('editor')
+        );
+        
+        if (editorKey && element[editorKey]) {
+          const editor = element[editorKey];
+          if (editor.update && typeof editor.update === 'function') {
+            editor.update(() => {
+              const root = editor.getRootElement();
+              if (root) {
+                root.innerHTML = '';
+                const p = document.createElement('p');
+                const span = document.createElement('span');
+                span.setAttribute('data-lexical-text', 'true');
+                span.textContent = query;
+                p.appendChild(span);
+                root.appendChild(p);
+              }
+            });
+            updatedViaAPI = true;
+            console.log('通过 Lexical API 更新内容');
+          }
+        }
+      } catch (apiError) {
+        console.log('Lexical API 方法失败，尝试其他方法:', apiError);
+      }
+      
+      // 方法2: 如果 API 方法失败，使用 DOM 操作 + 事件触发
+      if (!updatedViaAPI) {
+        // 先聚焦元素
+        element.focus();
+        
+        // 清空现有内容
+        const pElements = element.querySelectorAll('p');
+        if (pElements.length > 0) {
+          if (pElements.length > 1) {
+            for (let i = 1; i < pElements.length; i++) {
+              pElements[i].remove();
+            }
+          }
+          const pElement = pElements[0];
+          
+          // 清空并创建新内容
+          if (query.trim()) {
+            pElement.innerHTML = '';
+            const span = document.createElement('span');
+            span.setAttribute('data-lexical-text', 'true');
+            span.textContent = query;
+            pElement.appendChild(span);
+          } else {
+            pElement.innerHTML = '';
+          }
+        } else {
+          // 如果没有 p 元素，创建完整的 Lexical 结构
+          element.innerHTML = '';
+          const pElement = document.createElement('p');
+          if (query.trim()) {
+            const span = document.createElement('span');
+            span.setAttribute('data-lexical-text', 'true');
+            span.textContent = query;
+            pElement.appendChild(span);
+          }
+          element.appendChild(pElement);
+        }
+        
+        // 触发多种事件让 Lexical 识别变化
+        // 1. 触发 input 事件
+        const inputEvent = new InputEvent('input', {
+          bubbles: true,
+          cancelable: true,
+          inputType: 'insertText',
+          data: query
+        });
+        element.dispatchEvent(inputEvent);
+        
+        // 2. 触发 beforeinput 事件（Lexical 可能监听此事件）
+        const beforeInputEvent = new InputEvent('beforeinput', {
+          bubbles: true,
+          cancelable: true,
+          inputType: 'insertText',
+          data: query
+        });
+        element.dispatchEvent(beforeInputEvent);
+        
+        // 3. 触发 compositionstart, compositionupdate, compositionend（模拟输入法输入）
+        element.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+        element.dispatchEvent(new CompositionEvent('compositionupdate', { 
+          bubbles: true, 
+          data: query 
+        }));
+        element.dispatchEvent(new CompositionEvent('compositionend', { 
+          bubbles: true, 
+          data: query 
+        }));
+        
+        // 4. 触发 change 事件
+        const changeEvent = new Event('change', {
+          bubbles: true,
+          cancelable: true
+        });
+        element.dispatchEvent(changeEvent);
+        
+        // 5. 尝试使用 execCommand（如果浏览器支持）
+        let execCommandSuccess = false;
+        try {
+          // 选中所有内容
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          
+          // 使用 insertText 命令
+          if (document.execCommand('insertText', false, query)) {
+            console.log('使用 execCommand 插入文本成功');
+            execCommandSuccess = true;
+          }
+        } catch (execError) {
+          console.log('execCommand 方法失败:', execError);
+        }
+        
+        // 6. 如果 execCommand 失败，尝试通过 DataTransfer 模拟粘贴（作为最后手段）
+        if (!execCommandSuccess && query.trim()) {
+          try {
+            // 先聚焦并选中所有内容
+            element.focus();
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            // 创建 DataTransfer 对象模拟粘贴
+            const dataTransfer = new DataTransfer();
+            dataTransfer.setData('text/plain', query);
+            
+            // 触发 paste 事件
+            const pasteEvent = new ClipboardEvent('paste', {
+              clipboardData: dataTransfer,
+              bubbles: true,
+              cancelable: true
+            });
+            
+            // 先触发 beforeinput
+            const beforeInputEvent = new InputEvent('beforeinput', {
+              bubbles: true,
+              cancelable: true,
+              inputType: 'insertFromPaste',
+              data: query
+            });
+            element.dispatchEvent(beforeInputEvent);
+            
+            // 触发 paste 事件
+            const pasteHandled = element.dispatchEvent(pasteEvent);
+            
+            if (pasteHandled) {
+              console.log('通过模拟粘贴事件完成');
+            } else {
+              // 如果 paste 事件被阻止，尝试直接使用 insertText
+              document.execCommand('insertText', false, query);
+              console.log('通过 insertText 命令完成');
+            }
+          } catch (fallbackError) {
+            console.log('备用方法失败:', fallbackError);
+          }
+        }
+        
+        console.log('Lexical 编辑器内容已设置（通过 DOM + 事件）');
+      }
     } else {
-      element.innerHTML = '<p></p>';
-      element.querySelector('p').innerText = query;
+      // 处理普通 contenteditable 元素（支持 Tiptap/ProseMirror 等编辑器）
+      // 查找所有 p 元素，清空并替换为新内容
+      const pElements = element.querySelectorAll('p');
+      
+      if (pElements.length > 0) {
+        // 如果存在 p 元素，清空所有并只保留第一个
+        if (pElements.length > 1) {
+          // 如果有多个 p 元素，删除多余的
+          for (let i = 1; i < pElements.length; i++) {
+            pElements[i].remove();
+          }
+        }
+        const pElement = pElements[0];
+        // 移除空状态类（如 is-empty, is-editor-empty）
+        pElement.classList.remove('is-empty', 'is-editor-empty');
+        // 设置文本内容
+        pElement.innerText = query;
+        // 如果没有内容，保留空 p 元素，但移除占位符类
+        if (!query.trim()) {
+          pElement.innerHTML = '';
+        }
+      } else {
+        // 如果没有 p 元素，创建一个新的
+        element.innerHTML = '<p></p>';
+        const newP = element.querySelector('p');
+        if (newP) {
+          newP.innerText = query;
+        }
+      }
     }
   } else if (step.inputType === 'special') {
     // 使用配置驱动的特殊处理
     await executeSpecialSetValue(step, query, element);
+  } else if (step.inputType === 'angular') {
+    // 处理 Angular FormControl（如 Google AI Studio）
+    // Angular FormControl 的值由框架管理，不会直接反映在 DOM 中
+    // 需要通过事件来触发 Angular 的变更检测
+    
+    // 方法1: 设置值并触发事件
+    element.focus();
+    element.value = query;
+    
+    // 触发 input 事件（使用 InputEvent，Angular 监听此事件）
+    const inputEvent = new InputEvent('input', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: query
+    });
+    element.dispatchEvent(inputEvent);
+    
+    // 触发 change 事件
+    const changeEvent = new Event('change', {
+      bubbles: true,
+      cancelable: true
+    });
+    element.dispatchEvent(changeEvent);
+    
+    // 如果元素有 formControlName 属性，尝试直接访问 Angular FormControl
+    // 注意：这需要 Angular 的调试模式或特定上下文
+    try {
+      // 尝试通过 Angular 的 __ngContext__ 访问 FormControl
+      const ngElement = element;
+      if (ngElement.__ngContext__) {
+        // 找到对应的 FormControl 并设置值
+        const context = ngElement.__ngContext__;
+        for (let i = 0; i < context.length; i++) {
+          if (context[i] && typeof context[i].setValue === 'function') {
+            context[i].setValue(query);
+            console.log('通过 Angular FormControl API 设置值');
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      // 如果无法访问 Angular API，继续使用事件方式
+      console.log('无法访问 Angular FormControl API，使用事件方式');
+    }
+    
+    // 再次触发 focus（保持焦点）
+    element.focus();
+    
+    console.log('Angular FormControl 值已设置并触发事件');
   } else {
     // 普通输入框
     element.value = query;
+    
+    // 触发 input 事件确保框架能够检测到变化
+    const inputEvent = new InputEvent('input', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: query
+    });
+    element.dispatchEvent(inputEvent);
   }
 
   console.log('设置元素值:', foundSelector);
@@ -643,17 +970,45 @@ async function executeTriggerEvents(step) {
   // 支持多个选择器
   const selectors = Array.isArray(step.selector) ? step.selector : [step.selector];
   
-  for (const selector of selectors) {
-    element = document.querySelector(selector);
-    if (element) {
-      foundSelector = selector;
-      break;
-    }
-  }
+  // 如果指定了重试机制，使用重试逻辑
+  const maxAttempts = step.maxAttempts || (step.waitForElement ? 5 : 1);
+  const retryInterval = step.retryInterval || 200;
+  let attempts = 0;
   
-  if (!element) {
-    throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
-  }
+  const tryTriggerEvents = async () => {
+    // 尝试查找元素
+    let foundElement = null;
+    let foundSel = null;
+    
+    for (const selector of selectors) {
+      foundElement = document.querySelector(selector);
+      if (foundElement) {
+        foundSel = selector;
+        break;
+      }
+    }
+    
+    if (!foundElement) {
+      // 元素未找到，如果允许重试则重试
+      attempts++;
+      if (attempts < maxAttempts && (step.waitForElement || step.maxAttempts)) {
+        console.log(`元素未找到，${retryInterval}ms后重试 (${attempts}/${maxAttempts}): ${selectors.join(', ')}`);
+        await new Promise(resolve => setTimeout(resolve, retryInterval));
+        return tryTriggerEvents();
+      } else {
+        throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
+      }
+    }
+    
+    // 元素找到，设置变量并继续执行触发事件
+    element = foundElement;
+    foundSelector = foundSel;
+    return { element: foundElement, selector: foundSel };
+  };
+  
+  const result = await tryTriggerEvents();
+  element = result.element;
+  foundSelector = result.selector;
 
   const events = step.events || ['input', 'change'];
   events.forEach(eventName => {
@@ -694,6 +1049,10 @@ async function executeSendKeys(step, query) {
     throw new Error(`未找到任何元素，尝试的选择器: ${selectors.join(', ')}`);
   }
 
+  // 检测平台（Mac 使用 Command/Meta，Windows/Linux 使用 Ctrl）
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0 || 
+                navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+
   if (step.keys === 'Enter') {
     const enterEvent = new KeyboardEvent('keydown', {
       bubbles: true,
@@ -708,6 +1067,86 @@ async function executeSendKeys(step, query) {
     });
     element.dispatchEvent(enterEvent);
     console.log('发送回车键到元素:', foundSelector);
+  } else if (step.keys === '⌘ + Enter' || step.keys === 'Command+Enter' || step.keys === 'Meta+Enter') {
+    // 处理 ⌘ + Enter 组合键
+    // Mac 使用 Meta (Command) 键，Windows/Linux 使用 Ctrl 键
+    const metaKey = isMac; // Mac 使用 metaKey
+    const ctrlKey = !isMac; // Windows/Linux 使用 ctrlKey
+    
+    // 先触发 keydown 事件，包含修饰键
+    const keyDownEvent = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      location: 0,
+      repeat: false,
+      isComposing: false,
+      ctrlKey: ctrlKey,
+      metaKey: metaKey,
+      shiftKey: false,
+      altKey: false
+    });
+    element.dispatchEvent(keyDownEvent);
+    
+    // 再触发 keyup 事件，包含修饰键
+    const keyUpEvent = new KeyboardEvent('keyup', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      location: 0,
+      repeat: false,
+      isComposing: false,
+      ctrlKey: ctrlKey,
+      metaKey: metaKey,
+      shiftKey: false,
+      altKey: false
+    });
+    element.dispatchEvent(keyUpEvent);
+    
+    console.log(`发送 ${isMac ? '⌘ + Enter (Meta+Enter)' : 'Ctrl + Enter'} 到元素:`, foundSelector);
+  } else if (step.keys === 'Ctrl+Enter' || step.keys === 'Control+Enter') {
+    // 处理 Ctrl + Enter 组合键
+    const keyDownEvent = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      location: 0,
+      repeat: false,
+      isComposing: false,
+      ctrlKey: true,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false
+    });
+    element.dispatchEvent(keyDownEvent);
+    
+    const keyUpEvent = new KeyboardEvent('keyup', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      location: 0,
+      repeat: false,
+      isComposing: false,
+      ctrlKey: true,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false
+    });
+    element.dispatchEvent(keyUpEvent);
+    
+    console.log('发送 Ctrl + Enter 到元素:', foundSelector);
   } else {
     console.warn('不支持的按键类型:', step.keys);
   }
@@ -899,7 +1338,8 @@ async function getSiteHandler(domain) {
       name: site.name,
       searchHandler: site.searchHandler,
       fileUploadHandler: site.fileUploadHandler,
-      contentExtractor: site.contentExtractor
+      contentExtractor: site.contentExtractor,
+      historyHandler: site.historyHandler
     };
   } catch (error) {
     console.error('获取站点处理器失败:', error);
@@ -953,13 +1393,21 @@ window.addEventListener('message', async function(event) {
     }
     
     // 只处理 AIShortcuts 扩展的特定消息类型
-    const validMultiAITypes = ['TRIGGER_PASTE', 'search', 'EXTRACT_CONTENT'];
+    const validMultiAITypes = ['TRIGGER_PASTE', 'search', 'EXTRACT_CONTENT', 'SET_HISTORY_CONTEXT', 'GET_CURRENT_URL'];
     
     if (!validMultiAITypes.includes(event.data.type)) {
         return;
     }
     
     console.log('收到消息类型:', event.data.type);
+
+    // 接收父页面下发的历史上下文（用于把 URL 更新写回正确的 history 记录）
+    if (event.data.type === 'SET_HISTORY_CONTEXT') {
+        __aiCompareHistoryContext.historyId = event.data.historyId || null;
+        __aiCompareHistoryContext.siteName = event.data.siteName || __aiCompareHistoryContext.siteName;
+        console.log('✅ 已更新历史上下文:', __aiCompareHistoryContext);
+        return;
+    }
     
     // 处理文件粘贴消息 - 优先使用站点特定处理器
     if (event.data.type === 'TRIGGER_PASTE') {
@@ -1062,6 +1510,40 @@ window.addEventListener('message', async function(event) {
         return;
     }
 
+    // 处理获取当前 URL 消息
+    if (event.data.type === 'GET_CURRENT_URL') {
+        console.log('🎯 收到获取当前 URL 请求:', event.data);
+        
+        // 提取当前页面的URL（去掉locale等参数）
+        let pageUrl = window.location.href;
+        try {
+            // 查找alternate链接获取清洁的URL
+            const alternateLinks = document.querySelectorAll('link[rel="alternate"]');
+            for (const link of alternateLinks) {
+                const href = link.getAttribute('href');
+                if (href && href.includes('chatgpt.com/c/')) {
+                    const url = new URL(href);
+                    url.searchParams.delete('locale');
+                    pageUrl = url.toString();
+                    console.log(`🔗 从alternate标签获取清洁URL: ${pageUrl}`);
+                    break;
+                }
+            }
+        } catch (error) {
+            console.log('⚠️ URL清理失败，使用原始URL:', error);
+        }
+        
+        // 发送当前 URL 回父窗口
+        window.parent.postMessage({
+            type: 'GET_CURRENT_URL_RESPONSE',
+            siteName: event.data.siteName,
+            url: pageUrl
+        }, '*');
+        
+        console.log('✅ 已发送当前 URL:', pageUrl);
+        return;
+    }
+
     // 处理内容提取消息
     if (event.data.type === 'EXTRACT_CONTENT') {
         console.log('🎯 收到内容提取请求:', event.data);
@@ -1130,12 +1612,35 @@ window.addEventListener('message', async function(event) {
     console.log('🔍 调试信息 - 站点处理器:', siteHandler);
     
     if (siteHandler && siteHandler.searchHandler && event.data.query) {
+        // 记录本次搜索关联的 historyId（父页面会在消息里携带）
+        if (event.data.historyId) {
+            __aiCompareHistoryContext.historyId = event.data.historyId;
+            __aiCompareHistoryContext.siteName = siteHandler.name;
+        }
+
         console.log(`✅ 使用 ${siteHandler.name} 配置化处理器处理消息`);
         console.log('🔍 调试信息 - 搜索处理器配置:', siteHandler.searchHandler);
         try {
             // 使用配置化处理器执行
             await executeSiteHandler(event.data.query, siteHandler.searchHandler);
             console.log(`✅ ${siteHandler.name} 处理完成`);
+            
+            // 执行完成后，启动 URL 检测逻辑（如果配置了 historyHandler）
+            console.log('🔍 检查 historyHandler 配置:', {
+                hasHistoryHandler: !!siteHandler.historyHandler,
+                historyHandler: siteHandler.historyHandler,
+                urlFeature: siteHandler.historyHandler?.urlFeature
+            });
+            if (siteHandler.historyHandler && siteHandler.historyHandler.urlFeature) {
+                console.log(`✅ 启动 ${siteHandler.name} 的 URL 检测，特征: ${siteHandler.historyHandler.urlFeature}`);
+                startHistoryUrlDetection(
+                    siteHandler.name,
+                    siteHandler.historyHandler.urlFeature,
+                    event.data.historyId || __aiCompareHistoryContext.historyId
+                );
+            } else {
+                console.warn(`⚠️ ${siteHandler.name} 未配置 historyHandler 或 urlFeature，跳过 URL 检测`);
+            }
         } catch (error) {
             console.error(`❌ ${siteHandler.name} 处理失败:`, error);
         }
@@ -1361,10 +1866,104 @@ async function extractWithConfig(contentExtractor, siteName) {
         const duration = endTime - startTime;
         console.log(`📊 内容提取完成 - 方法: ${extractionMethod || '失败'}, 耗时: ${duration.toFixed(2)}ms`);
     }
-    
-    // 如果都失败了，返回提示信息
-    console.log('⚠️ 所有提取方法都失败，返回提示信息');
-    return `无法自动提取 ${siteName} 的详细内容，请手动复制。\n\n提示：该站点可能尚未配置内容提取规则，或者页面结构发生了变化。`;
+}
+
+// 启动历史记录 URL 检测
+// 持续检测当前页面的 URL 是否包含指定的 urlFeature，如果匹配则通知父窗口更新历史记录
+function startHistoryUrlDetection(siteName, urlFeature, historyId) {
+  console.log(`🔍 开始检测 ${siteName} 的 URL 特征: ${urlFeature}`);
+  const targetHistoryId = historyId || __aiCompareHistoryContext.historyId || null;
+  
+  let lastMatchedUrl = null; // 记录上一次匹配的 URL，避免重复发送
+  let checkInterval = null;
+  let checkCount = 0;
+  const maxChecks = 60; // 最多检测 60 次（30秒，每次间隔500ms）
+  
+  // 检查 URL 是否匹配
+  const checkUrl = () => {
+    try {
+      const currentUrl = window.location.href;
+      const currentPath = window.location.pathname;
+      
+      // 检查 URL 路径是否包含 urlFeature
+      if (currentPath.includes(urlFeature)) {
+        // URL 匹配，且与上次匹配的 URL 不同
+        if (currentUrl !== lastMatchedUrl) {
+          lastMatchedUrl = currentUrl;
+          console.log(`✅ ${siteName} URL 匹配成功: ${currentUrl}`);
+          
+          // 发送消息通知父窗口更新历史记录
+          window.parent.postMessage({
+            type: 'HISTORY_URL_UPDATE',
+            source: 'inject-script',
+            siteName: siteName,
+            url: currentUrl,
+            historyId: targetHistoryId
+          }, '*');
+          
+          console.log(`📤 已通知父窗口更新 ${siteName} 的历史记录 URL`);
+          
+          // 停止检测
+          if (checkInterval) {
+            clearInterval(checkInterval);
+            checkInterval = null;
+          }
+          return true;
+        }
+      }
+      
+      checkCount++;
+      if (checkCount >= maxChecks) {
+        console.log(`⏰ ${siteName} URL 检测超时（${maxChecks} 次检查），停止检测`);
+        if (checkInterval) {
+          clearInterval(checkInterval);
+          checkInterval = null;
+        }
+        return false;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error(`❌ ${siteName} URL 检测失败:`, error);
+      if (checkInterval) {
+        clearInterval(checkInterval);
+        checkInterval = null;
+      }
+      return false;
+    }
+  };
+  
+  // 立即检查一次（页面可能已经跳转）
+  if (checkUrl()) {
+    return; // 如果立即匹配，则不再设置定时器
+  }
+  
+  // 每 500ms 检查一次
+  checkInterval = setInterval(checkUrl, 500);
+  
+  // 同时监听 URL 变化事件（pushState, replaceState, popstate, hashchange）
+  const urlChangeHandler = () => {
+    checkUrl();
+  };
+  
+  // 包装原生方法以监听 URL 变化
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+  
+  history.pushState = function(...args) {
+    originalPushState.apply(history, args);
+    setTimeout(urlChangeHandler, 100); // 延迟检查，确保 URL 已更新
+  };
+  
+  history.replaceState = function(...args) {
+    originalReplaceState.apply(history, args);
+    setTimeout(urlChangeHandler, 100);
+  };
+  
+  window.addEventListener('popstate', urlChangeHandler);
+  window.addEventListener('hashchange', urlChangeHandler);
+  
+  console.log(`⏱️ ${siteName} URL 检测已启动，将每 500ms 检查一次，最多检测 ${maxChecks} 次`);
 }
 
 // 验证选择器有效性

@@ -82,12 +82,11 @@ async function initializeButtonConfigs() {
   try {
     // 获取存储的按钮配置
     let { buttonConfig } = await chrome.storage.sync.get(['buttonConfig']);
-    let currentConfig = buttonConfig || {
-      floatButton: true,
-      selectionSearch: true,
-      contextMenu: true,
-      searchEngine: true
-    };
+    
+    // 从 appConfig.json 获取默认配置
+    const defaultButtonConfig = await window.AppConfigManager.getButtonConfig();
+    
+    let currentConfig = buttonConfig || defaultButtonConfig;
 
     console.log('初始配置:', currentConfig);
 
@@ -606,7 +605,7 @@ async function initializeDisabledSites() {
     if (disabledSites.length === 0) {
       container.innerHTML = `
         <div class="empty-state" style="text-align: center; color: #999; padding: 40px;">
-          <p>暂无禁用的网站</p>
+          <p>${chrome.i18n.getMessage('noDisabledSites')}</p>
         </div>
       `;
       return;
@@ -1052,6 +1051,16 @@ function initializeNavigation() {
   });
 }
 
+// 打开历史记录页面（当前标签页跳转）
+function openHistoryPage() {
+  window.location.href = chrome.runtime.getURL('history/history.html');
+}
+
+// 打开收藏记录页面（当前标签页跳转）
+function openFavoritesPage() {
+  window.location.href = chrome.runtime.getURL('favorites/favorites.html');
+}
+
 // 页面初始化
 document.addEventListener('DOMContentLoaded', () => {
   console.log('Options page loaded');
@@ -1070,4 +1079,22 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // 监听 hash 变化
   window.addEventListener('hashchange', handleHashNavigation);
+  
+  // 绑定历史记录链接点击事件
+  const historyLink = document.getElementById('historyLink');
+  if (historyLink) {
+    historyLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      openHistoryPage();
+    });
+  }
+
+  // 绑定收藏记录链接点击事件
+  const favoritesLink = document.getElementById('favoritesLink');
+  if (favoritesLink) {
+    favoritesLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      openFavoritesPage();
+    });
+  }
 });

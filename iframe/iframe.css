@@ -8,6 +8,7 @@ html {
   border-radius: 8px;
   overflow: hidden;
   scroll-margin-top: 0;
+  position: relative; /* 为悬浮按钮提供定位上下文 */
 }
 
 .iframe-header {
@@ -19,13 +20,25 @@ html {
   border-bottom: 1px solid #ddd;
 }
 
+.iframe-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
 
 .iframe-controls button {
-  margin-left: 8px;
   padding: 4px 8px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* 当鼠标悬停在 iframe-container 上时显示按钮 */
+.iframe-container:hover .iframe-controls button {
+  opacity: 1;
 }
 
 .ai-iframe {
@@ -49,20 +62,21 @@ html {
 
 .search-bar {
     position: fixed;
-    top: 0;
+    top: 12px;
     left: 0;
     right: 0;
-    padding: 10px;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 10px 14px;
     background: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    border-radius: 8px;
     z-index: 1000;
     display: flex;
     gap: 10px;
-    max-width: 1200px;
-    margin: 0 auto;
-    justify-content: space-between; /* 改为两端对齐 */
-    min-height: 36px; /* 最小高度，允许扩展 */
-    align-items: flex-start; /* 顶部对齐，允许输入框向下扩展 */
+    justify-content: space-between;
+    min-height: 36px;
+    align-items: flex-start;
 }
 
 /* 右侧按钮组容器 - 实现等间距分布 */
@@ -230,11 +244,11 @@ html {
 
 
 #iframes-container {
-    margin-top: 60px;
+    margin-top: 72px;
     display: grid;
     grid-template-columns: repeat(var(--columns, 2), 1fr);
     gap: 16px;
-    padding: 16px;
+    padding: 16px 0;
 }
 
 /* 在侧边栏模式下默认显示1列 */
@@ -537,6 +551,35 @@ html {
     background: #f5f5f5;
   }
   
+/* 收藏按钮容器 */
+.favorite-icon-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    padding: 0;
+    cursor: pointer;
+    background: transparent;
+    flex-shrink: 0; /* 防止收缩，与其他图标容器保持一致 */
+}
+
+.favorite-icon-container:hover {
+    background: #e9ecef;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
+}
+
+.favorite-icon {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
 .nav {
     position: fixed;
     left: 0;
@@ -562,9 +605,39 @@ html {
     cursor: pointer;
     transition: background-color 0.3s;
     white-space: nowrap;
-    margin-right: 10px;
     display: inline-block;
     min-width: fit-content;
+}
+
+.open-page-btn {
+    width: 16px;
+    height: 16px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+    position: relative;
+    font-size: 14px;
+    line-height: 16px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.open-page-btn::before {
+    content: '↗';
+    font-size: 14px;
+}
+
+/* 当 iframe-container hover 时，按钮显示并可以进一步 hover */
+.iframe-container:hover .open-page-btn {
+    opacity: 0.7;
+}
+
+.iframe-container:hover .open-page-btn:hover {
+    opacity: 1;
+    color: #333;
 }
 
 .close-btn {
@@ -575,11 +648,15 @@ html {
     background-size: contain;
     cursor: pointer;
     padding: 0;
-    opacity: 0.7;
     transition: opacity 0.3s;
 }
 
-.close-btn:hover {
+/* 当 iframe-container hover 时，按钮显示并可以进一步 hover */
+.iframe-container:hover .close-btn {
+    opacity: 0.7;
+}
+
+.iframe-container:hover .close-btn:hover {
     opacity: 1;
 }
 
@@ -1088,6 +1165,49 @@ html {
 @keyframes slideInRight {
     from { transform: translateX(100%); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }
+}
+
+/* iframe 悬浮收藏按钮：默认隐藏，仅在该 iframe 内悬停时显示 */
+.iframe-favorite-btn {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #ddd;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    z-index: 100;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.iframe-container:hover .iframe-favorite-btn {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.iframe-favorite-btn:hover {
+    background: rgba(255, 255, 255, 1);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+    transform: translateY(-1px);
+}
+
+.iframe-favorite-btn:active {
+    transform: translateY(0);
+}
+
+.iframe-favorite-icon {
+    width: 14px;
+    height: 14px;
+    display: block;
 }
 
 

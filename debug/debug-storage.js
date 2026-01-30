@@ -5,7 +5,8 @@ let globalData = {
     local: null,
     sync: null,
     config: null,
-    remote: null
+    remote: null,
+    merged: null
 };
 
 // 工具函数：格式化 JSON
@@ -216,6 +217,72 @@ async function loadLocalConfig() {
     }
 }
 
+// 加载合并后的站点
+async function loadMergedSites() {
+    const statusEl = document.getElementById('merged-status');
+    const contentEl = document.getElementById('merged-content');
+    
+    try {
+        console.log('开始加载合并后的站点...');
+        statusEl.innerHTML = '<div class="loading-spinner"></div> 正在加载...';
+        statusEl.className = 'status loading';
+
+        if (!window.getDefaultSites) {
+            throw new Error('getDefaultSites 函数未找到 - 请确保 baseConfig.js 已正确加载');
+        }
+
+        const mergedSites = await window.getDefaultSites();
+        console.log('合并后的站点数据:', mergedSites);
+        globalData.merged = mergedSites;
+
+        statusEl.textContent = '✅ 加载成功';
+        statusEl.className = 'status success';
+        
+        // 创建表格显示站点名称和 enabled 状态
+        if (Array.isArray(mergedSites) && mergedSites.length > 0) {
+            const tableHTML = `
+                <table class="sites-table">
+                    <thead>
+                        <tr>
+                            <th>站点名称</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${mergedSites.map(site => `
+                            <tr>
+                                <td>${site.name || '未知站点'}</td>
+                                <td>
+                                    <span class="status-badge ${site.enabled ? 'enabled' : 'disabled'}">
+                                        ${site.enabled ? '✓ 启用' : '✗ 禁用'}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            contentEl.innerHTML = tableHTML;
+        } else {
+            contentEl.innerHTML = '<div class="error-message">暂无站点数据</div>';
+        }
+        
+        const stats = getObjectStats(mergedSites);
+        renderStats(stats, 'merged-stats');
+
+        console.log('合并后的站点加载完成');
+
+    } catch (error) {
+        console.error('加载合并后的站点失败:', error);
+        statusEl.textContent = `❌ 加载失败: ${error.message}`;
+        statusEl.className = 'status error';
+        contentEl.innerHTML = `<div class="error-message">
+            错误详情: ${error.message}<br>
+            错误堆栈: ${error.stack?.slice(0, 200)}...
+        </div>`;
+    }
+}
+
 // 加载远程配置
 async function loadRemoteConfig() {
     const statusEl = document.getElementById('remote-status');
@@ -289,14 +356,143 @@ async function loadRemoteConfig() {
     }
 }
 
+// 加载历史记录
+async function loadHistory() {
+    const statusEl = document.getElementById('history-status');
+    const contentEl = document.getElementById('history-content');
+    
+    try {
+        console.log('开始加载历史记录...');
+        statusEl.innerHTML = '<div class="loading-spinner"></div> 正在加载...';
+        statusEl.className = 'status loading';
+
+        if (!chrome?.storage?.local) {
+            throw new Error('Chrome Storage Local API 不可用');
+        }
+
+        const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
+        console.log('历史记录数据:', pkHistory);
+
+        statusEl.textContent = '✅ 加载成功';
+        statusEl.className = 'status success';
+        
+        contentEl.textContent = formatJSON(pkHistory);
+        
+        // 计算统计信息
+        const stats = {};
+        if (pkHistory.length > 0) {
+            stats.总数 = pkHistory.length;
+            const latestDate = new Date(pkHistory[0].timestamp);
+            const oldestDate = new Date(pkHistory[pkHistory.length - 1].timestamp);
+            stats.最新记录 = latestDate.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            stats.最旧记录 = oldestDate.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } else {
+            stats.总数 = 0;
+        }
+        renderStats(stats, 'history-stats');
+
+        console.log('历史记录加载完成');
+
+    } catch (error) {
+        console.error('加载历史记录失败:', error);
+        statusEl.textContent = `❌ 加载失败: ${error.message}`;
+        statusEl.className = 'status error';
+        contentEl.innerHTML = `<div class="error-message">
+            错误详情: ${error.message}<br>
+            错误堆栈: ${error.stack?.slice(0, 200)}...
+        </div>`;
+    }
+}
+
+// 加载收藏记录（从历史记录中筛选包含收藏站点的记录）
+async function loadFavorites() {
+    const statusEl = document.getElementById('favorites-status');
+    const contentEl = document.getElementById('favorites-content');
+    
+    try {
+        console.log('开始加载收藏记录...');
+        statusEl.innerHTML = '<div class="loading-spinner"></div> 正在加载...';
+        statusEl.className = 'status loading';
+
+        if (!chrome?.storage?.local) {
+            throw new Error('Chrome Storage Local API 不可用');
+        }
+
+        const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
+        const favoriteItems = pkHistory
+            .filter(item => item.sites && item.sites.some(site => site.isFavorite === true))
+            .map(item => ({
+                ...item,
+                sites: item.sites.filter(site => site.isFavorite === true)
+            }));
+        console.log('收藏记录数据:', favoriteItems);
+
+        statusEl.textContent = '✅ 加载成功';
+        statusEl.className = 'status success';
+        
+        contentEl.textContent = formatJSON(favoriteItems);
+        
+        // 计算统计信息（与历史记录展示一致）
+        const stats = {};
+        if (favoriteItems.length > 0) {
+            stats.总数 = favoriteItems.length;
+            const latestDate = new Date(favoriteItems[0].timestamp);
+            const oldestDate = new Date(favoriteItems[favoriteItems.length - 1].timestamp);
+            stats.最新记录 = latestDate.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            stats.最旧记录 = oldestDate.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } else {
+            stats.总数 = 0;
+        }
+        renderStats(stats, 'favorites-stats');
+
+        console.log('收藏记录加载完成');
+
+    } catch (error) {
+        console.error('加载收藏记录失败:', error);
+        statusEl.textContent = `❌ 加载失败: ${error.message}`;
+        statusEl.className = 'status error';
+        contentEl.innerHTML = `<div class="error-message">
+            错误详情: ${error.message}<br>
+            错误堆栈: ${error.stack?.slice(0, 200)}...
+        </div>`;
+    }
+}
+
 // 刷新全部
 async function refreshAll() {
     console.log('开始刷新全部数据...');
     await Promise.all([
+        loadHistory(),
+        loadFavorites(),
         loadLocalStorage(),
         loadSyncStorage(),
         loadLocalConfig(),
-        loadRemoteConfig()
+        loadRemoteConfig(),
+        loadMergedSites()
     ]);
     console.log('全部数据刷新完成');
 }
@@ -324,7 +520,8 @@ function exportAll() {
         local: globalData.local,
         sync: globalData.sync,
         config: globalData.config,
-        remote: globalData.remote
+        remote: globalData.remote,
+        merged: globalData.merged
     };
 
     const dataStr = JSON.stringify(exportData, null, 2);
@@ -421,6 +618,8 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
         // 可以选择自动刷新对应的存储
         if (namespace === 'local') {
             loadLocalStorage();
+            loadHistory();
+            loadFavorites();
         } else if (namespace === 'sync') {
             loadSyncStorage();
         }
@@ -458,13 +657,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'loadRemoteConfig':
                     loadRemoteConfig();
                     break;
+                case 'loadMergedSites':
+                    loadMergedSites();
+                    break;
+                case 'loadHistory':
+                    loadHistory();
+                    break;
+                case 'loadFavorites':
+                    loadFavorites();
+                    break;
             }
         }
         
         // 保留原有的刷新按钮逻辑（兼容）
         if (e.target.textContent === '刷新' || e.target.classList.contains('refresh-btn')) {
-            const columnClass = e.target.closest('.column').classList[1];
-            switch(columnClass) {
+            const column = e.target.closest('.column');
+            const columnClass = column ? column.classList[1] : '';
+            const action = e.target.getAttribute('data-action');
+            if (action) {
+                // data-action 已在上方处理
+            } else switch(columnClass) {
                 case 'column-1':
                     loadLocalStorage();
                     break;
@@ -476,6 +688,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
                 case 'column-4':
                     loadRemoteConfig();
+                    break;
+                case 'column-5':
+                    loadMergedSites();
+                    break;
+                case 'column-6':
+                    loadHistory();
+                    break;
+                case 'column-7':
+                    loadFavorites();
                     break;
             }
         }
@@ -490,3 +711,6 @@ window.loadLocalStorage = loadLocalStorage;
 window.loadSyncStorage = loadSyncStorage;
 window.loadLocalConfig = loadLocalConfig;
 window.loadRemoteConfig = loadRemoteConfig;
+window.loadMergedSites = loadMergedSites;
+window.loadHistory = loadHistory;
+window.loadFavorites = loadFavorites;

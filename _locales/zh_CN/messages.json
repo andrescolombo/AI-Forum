@@ -1,9 +1,12 @@
 {
+  "shortName": {
+    "message": "AI 比一比"
+  },
   "appName": {
-    "message": "AI比一比 - 一键对比 ChatGPT, Gemini, DeepSeek 等多个AI"
+    "message": "AI比一比 - 一键对比 ChatGPT, Gemini, Grok 等多个AI"
   },
   "extDescription": {
-    "message": "AI比一比 - 一键对比 ChatGPT, Claude, Gemini, DeepSeek 等多个AI的回答，快速找到最佳解决方案。"
+    "message": "帮你从十多个AI中快速找到最佳答案。"
   },
   "configTitle": {
     "message": "AI站点设置"
@@ -259,6 +262,17 @@
   "exportResponses": {
     "message": "导出AI比一比结果"
   },
+  "historyTitle": {
+    "message": "历史记录"
+  },
+  "historyMaxRecordsTip": {
+    "message": "只保存最近的$COUNT$条记录",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "exportModalTitle": {
     "message": "导出AI比一比结果"
   },
@@ -294,5 +308,26 @@
   },
   "devNotice": {
     "message": "功能在开发中，可能会有错误或不足"
+  },
+  "pinGuideTitle": {
+    "message": "将扩展固定到工具栏，方便快速访问"
+  },
+  "pinGuideSteps": {
+    "message": "点击工具栏的拼图图标 → 找到「AI比一比」→ 点击固定图标"
+  },
+  "userFeedback": {
+    "message": "用户反馈"
+  },
+  "saveFavoriteSites": {
+    "message": "保存"
+  },
+  "saveFavoriteSitesTitle": {
+    "message": "保存当前选中的站点为常用站点"
+  },
+  "favoriteSitesSaved": {
+    "message": "常用站点已保存"
+  },
+  "noSitesSelected": {
+    "message": "请至少选择一个站点"
   }
 } 

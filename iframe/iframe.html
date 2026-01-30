@@ -49,15 +49,15 @@
                 </svg>
             </button>
         
-        <!-- 隐藏的文件选择input -->
-        <input type="file" id="fileInput" style="display: none;" multiple 
-               accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.rtf,.pages,.numbers,.key,.txt,.csv,.json,.xml,.html,.css,.js,.py,.java,.cpp,.c,.php,.zip,.rar,.7z,.gz,.tar,.wps,.et,.dps,.vsd,.vsdx,.pub,.one,.msg,.eml,.mpp">
-        
-        <!-- 
-        <select id="analysisDropdown" disabled >
-            <option value="">深度分析</option>
-        </select>
-        -->
+            <!-- 隐藏的文件选择input -->
+            <input type="file" id="fileInput" style="display: none;" multiple 
+                accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.rtf,.pages,.numbers,.key,.txt,.csv,.json,.xml,.html,.css,.js,.py,.java,.cpp,.c,.php,.zip,.rar,.7z,.gz,.tar,.wps,.et,.dps,.vsd,.vsdx,.pub,.one,.msg,.eml,.mpp">
+            
+            <!-- 
+            <select id="analysisDropdown" disabled >
+                <option value="">深度分析</option>
+            </select>
+            -->
             <div class="column-selector">
                 <!-- 当前选中的图标显示区域 -->
                 <div class="column-current">
@@ -106,19 +106,24 @@
             <div class="settings-icon-container">
                 <img src="../icons/setting.png" class="settings-icon" title="iframe-site-setting">
                 <div class="settings-dialog">
-                <div class="dialog-header">
-                    <h3 data-i18n="iframeSiteSettings">集合模式站点设置</h3>
-                    <button class="save-settings-btn" title="saveSettings">
-                        <img src="../icons/save.png" alt="save" class="save-icon">
-                    </button>
-                </div>
-                <div class="multi-ai-dialog">
-                    <div class="site-list">
-                        <!-- 站点选项将通过 JavaScript 动态添加 -->
+                    <div class="dialog-header">
+                        <h3 data-i18n="iframeSiteSettings">站点设置</h3>
+                        <button class="save-settings-btn" title="saveSettings">
+                            <img src="../icons/save.png" alt="save" class="save-icon">
+                        </button>
+                    </div>
+                    <div class="multi-ai-dialog">
+                        <div class="site-list">
+                            <!-- 站点选项将通过 JavaScript 动态添加 -->
+                        </div>
                     </div>
                 </div>
+            
             </div>
-        </div>
+
+            <div class="favorite-icon-container">
+                <img src="../icons/star_unsaved.png" class="favorite-icon" data-i18n="favoriteAllSites" title="Favorite All Sites">
+            </div>
         </div> <!-- 结束 search-bar-right-buttons 容器 -->
     </div>
     <div id="iframes-container">
@@ -128,6 +133,7 @@
         <!-- 收藏的 query 列表将动态添加到这里 -->
     </div>
     <script src="../config/baseConfig.js"></script>
+    <script src="../config/analytics.js"></script>
     <script type="module" src="iframe.js"></script>
     <script src="export-responses.js"></script>
 </body>
