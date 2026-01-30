@@ -1607,7 +1607,7 @@
         ]
       },
       "historyHandler": {
-        "urlFeature": "/chat/"
+        "urlFeature": "/c/"
       },
       "userPromptButton": {
         "containerSelector": "[data-message-author-role=\"user\"]",

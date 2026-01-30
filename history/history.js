@@ -1,3 +1,6 @@
+// 存储所有历史记录数据
+let allHistoryItems = [];
+
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', async () => {
     await loadHistory();
@@ -10,6 +13,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             await loadHistory();
         }
     });
+    
+    // 绑定搜索输入框事件
+    const searchInput = document.getElementById('searchInput');
+    searchInput.addEventListener('input', (e) => {
+        filterHistory(e.target.value);
+    });
 });
 
 // 加载历史记录
@@ -17,23 +26,43 @@ async function loadHistory() {
     try {
         const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
         
+        // 保存所有历史记录
+        allHistoryItems = pkHistory;
+        
         const historyList = document.getElementById('historyList');
         const emptyState = document.getElementById('emptyState');
+        const noResultsState = document.getElementById('noResultsState');
+        const searchInput = document.getElementById('searchInput');
+        
+        // 获取当前搜索关键词
+        const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        
+        // 根据搜索关键词过滤
+        const filteredItems = filterItemsBySearch(pkHistory, searchTerm);
         
         if (pkHistory.length === 0) {
             historyList.style.display = 'none';
             emptyState.style.display = 'block';
+            noResultsState.style.display = 'none';
+            return;
+        }
+        
+        if (filteredItems.length === 0 && searchTerm) {
+            historyList.style.display = 'none';
+            emptyState.style.display = 'none';
+            noResultsState.style.display = 'block';
             return;
         }
         
         historyList.style.display = 'flex';
         emptyState.style.display = 'none';
+        noResultsState.style.display = 'none';
         
         // 清空现有内容
         historyList.innerHTML = '';
         
         // 渲染历史记录
-        pkHistory.forEach(item => {
+        filteredItems.forEach(item => {
             const historyItem = createHistoryItem(item);
             historyList.appendChild(historyItem);
         });
@@ -41,6 +70,61 @@ async function loadHistory() {
     } catch (error) {
         console.error('加载历史记录失败:', error);
     }
+}
+
+// 根据搜索关键词过滤历史记录
+function filterItemsBySearch(items, searchTerm) {
+    if (!searchTerm) {
+        return items;
+    }
+    
+    return items.filter(item => {
+        // 搜索查询关键词
+        const queryMatch = item.query && item.query.toLowerCase().includes(searchTerm);
+        
+        // 搜索站点名称
+        const siteMatch = item.sites && item.sites.some(site => 
+            site.name && site.name.toLowerCase().includes(searchTerm)
+        );
+        
+        return queryMatch || siteMatch;
+    });
+}
+
+// 过滤历史记录
+function filterHistory(searchTerm) {
+    const filteredItems = filterItemsBySearch(allHistoryItems, searchTerm.toLowerCase());
+    
+    const historyList = document.getElementById('historyList');
+    const emptyState = document.getElementById('emptyState');
+    const noResultsState = document.getElementById('noResultsState');
+    
+    if (allHistoryItems.length === 0) {
+        historyList.style.display = 'none';
+        emptyState.style.display = 'block';
+        noResultsState.style.display = 'none';
+        return;
+    }
+    
+    if (filteredItems.length === 0 && searchTerm.trim()) {
+        historyList.style.display = 'none';
+        emptyState.style.display = 'none';
+        noResultsState.style.display = 'block';
+        return;
+    }
+    
+    historyList.style.display = 'flex';
+    emptyState.style.display = 'none';
+    noResultsState.style.display = 'none';
+    
+    // 清空现有内容
+    historyList.innerHTML = '';
+    
+    // 渲染过滤后的历史记录
+    filteredItems.forEach(item => {
+        const historyItem = createHistoryItem(item);
+        historyList.appendChild(historyItem);
+    });
 }
 
 // 创建历史记录项
@@ -143,7 +227,8 @@ async function openHistoryItem(item) {
                     try {
                         await chrome.tabs.sendMessage(currentTab.id, {
                             type: 'loadHistoryIframes',
-                            sites: item.sites
+                            sites: item.sites,
+                            historyId: item.id  // 传递历史记录 ID
                         });
                     } catch (error) {
                         console.error('发送消息失败:', error);
@@ -166,6 +251,8 @@ async function deleteHistoryItem(id) {
         const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
         const updatedHistory = pkHistory.filter(item => item.id !== id);
         await chrome.storage.local.set({ pkHistory: updatedHistory });
+        // 更新存储的所有历史记录
+        allHistoryItems = updatedHistory;
     } catch (error) {
         console.error('删除历史记录失败:', error);
     }

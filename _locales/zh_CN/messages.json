@@ -3,10 +3,10 @@
     "message": "AI 比一比"
   },
   "appName": {
-    "message": "AI比一比 - 在同一页面同时对比多个AI网站"
+    "message": "AI比一比 - 一键对比 ChatGPT, Gemini, Grok 等多个AI"
   },
   "extDescription": {
-    "message": "在同一页面同时查询并对比 ChatGPT、Gemini、Grok、Claude 等十多个AI网站的回答。"
+    "message": "帮你从十多个AI中快速找到最佳答案。"
   },
   "configTitle": {
     "message": "AI站点设置"
@@ -36,9 +36,6 @@
   },
   "openPage": {
     "message": "标签页模式"
-  },
-  "openInNewTab": {
-    "message": "在新标签页打开"
   },
   "commandDescription": {
     "message": "快捷键(Mac下 ⌘+M , Windows下 Ctrl+M)"
@@ -178,9 +175,6 @@
   "disabledSitesDescription": {
     "message": "管理悬浮球被禁用的网站，您可以在这里重新启用悬浮球"
   },
-  "noDisabledSites": {
-    "message": "暂无禁用的网站"
-  },
   "searchProviderName": {
     "message": "AI比一比"
   },
@@ -271,19 +265,6 @@
   "historyTitle": {
     "message": "历史记录"
   },
-  "historyLink": {
-    "message": "历史记录"
-  },
-  "favoritesLink": {
-    "message": "收藏记录"
-  },
-  "settingsLink": {
-    "message": "设置"
-  },
-  "favoriteAllSites": {
-    "message": "收藏所有站点",
-    "description": "收藏所有站点按钮的提示文本"
-  },
   "historyMaxRecordsTip": {
     "message": "只保存最近的$COUNT$条记录",
     "placeholders": {
@@ -335,7 +316,7 @@
     "message": "点击工具栏的拼图图标 → 找到「AI比一比」→ 点击固定图标"
   },
   "userFeedback": {
-    "message": "需求反馈"
+    "message": "用户反馈"
   },
   "saveFavoriteSites": {
     "message": "保存"
@@ -348,11 +329,5 @@
   },
   "noSitesSelected": {
     "message": "请至少选择一个站点"
-  },
-  "automationNotice": {
-    "message": "如果网站更新，对应的自动化提问功能会失效，敬请谅解。发现失效，可以与我联系更新"
-  },
-  "reviewLink": {
-    "message": "⭐ 五星好评"
   }
 } 

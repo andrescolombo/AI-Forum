@@ -1,3 +1,6 @@
+// 存储所有收藏记录数据
+let allFavoriteItems = [];
+
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', async () => {
     await loadFavorites();
@@ -9,6 +12,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             await clearAllFavorites();
             await loadFavorites();
         }
+    });
+    
+    // 绑定搜索输入框事件
+    const searchInput = document.getElementById('searchInput');
+    searchInput.addEventListener('input', (e) => {
+        filterFavorites(e.target.value);
     });
 });
 
@@ -25,23 +34,43 @@ async function loadFavorites() {
                 sites: item.sites.filter(site => site.isFavorite === true)
             }));
         
+        // 保存所有收藏记录
+        allFavoriteItems = favoriteItems;
+        
         const favoritesList = document.getElementById('favoritesList');
         const emptyState = document.getElementById('emptyState');
+        const noResultsState = document.getElementById('noResultsState');
+        const searchInput = document.getElementById('searchInput');
+        
+        // 获取当前搜索关键词
+        const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        
+        // 根据搜索关键词过滤
+        const filteredItems = filterItemsBySearch(favoriteItems, searchTerm);
         
         if (favoriteItems.length === 0) {
             favoritesList.style.display = 'none';
             emptyState.style.display = 'block';
+            noResultsState.style.display = 'none';
+            return;
+        }
+        
+        if (filteredItems.length === 0 && searchTerm) {
+            favoritesList.style.display = 'none';
+            emptyState.style.display = 'none';
+            noResultsState.style.display = 'block';
             return;
         }
         
         favoritesList.style.display = 'flex';
         emptyState.style.display = 'none';
+        noResultsState.style.display = 'none';
         
         // 清空现有内容
         favoritesList.innerHTML = '';
         
         // 渲染收藏记录
-        favoriteItems.forEach(item => {
+        filteredItems.forEach(item => {
             const favoriteItem = createFavoriteItem(item);
             favoritesList.appendChild(favoriteItem);
         });
@@ -49,6 +78,61 @@ async function loadFavorites() {
     } catch (error) {
         console.error('加载收藏记录失败:', error);
     }
+}
+
+// 根据搜索关键词过滤收藏记录
+function filterItemsBySearch(items, searchTerm) {
+    if (!searchTerm) {
+        return items;
+    }
+    
+    return items.filter(item => {
+        // 搜索查询关键词
+        const queryMatch = item.query && item.query.toLowerCase().includes(searchTerm);
+        
+        // 搜索站点名称
+        const siteMatch = item.sites && item.sites.some(site => 
+            site.name && site.name.toLowerCase().includes(searchTerm)
+        );
+        
+        return queryMatch || siteMatch;
+    });
+}
+
+// 过滤收藏记录
+function filterFavorites(searchTerm) {
+    const filteredItems = filterItemsBySearch(allFavoriteItems, searchTerm.toLowerCase());
+    
+    const favoritesList = document.getElementById('favoritesList');
+    const emptyState = document.getElementById('emptyState');
+    const noResultsState = document.getElementById('noResultsState');
+    
+    if (allFavoriteItems.length === 0) {
+        favoritesList.style.display = 'none';
+        emptyState.style.display = 'block';
+        noResultsState.style.display = 'none';
+        return;
+    }
+    
+    if (filteredItems.length === 0 && searchTerm.trim()) {
+        favoritesList.style.display = 'none';
+        emptyState.style.display = 'none';
+        noResultsState.style.display = 'block';
+        return;
+    }
+    
+    favoritesList.style.display = 'flex';
+    emptyState.style.display = 'none';
+    noResultsState.style.display = 'none';
+    
+    // 清空现有内容
+    favoritesList.innerHTML = '';
+    
+    // 渲染过滤后的收藏记录
+    filteredItems.forEach(item => {
+        const favoriteItem = createFavoriteItem(item);
+        favoritesList.appendChild(favoriteItem);
+    });
 }
 
 // 创建收藏记录项
@@ -186,6 +270,8 @@ async function deleteFavoriteItem(id) {
         }
         
         await chrome.storage.local.set({ pkHistory: pkHistory });
+        // 重新加载收藏记录以更新 allFavoriteItems
+        await loadFavorites();
     } catch (error) {
         console.error('删除收藏记录失败:', error);
     }

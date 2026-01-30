@@ -3,13 +3,13 @@
     "message": "AI Compare"
   },
   "appName": {
-    "message": "AI Compare - Compare Multiple AI Sites Side-by-Side in One Page"
+    "message": "AI Compare - OneClick to compare ChatGPT, Gemini, Grok and more."
   },
   "extDescription": {
-    "message": "Compare responses from ChatGPT, Gemini, Grok, Claude, and 10+ AI sites simultaneously in one page."
+    "message": "AI Compare helps you find the best answer from multiple AI quickly."
   },
   "configTitle": {
-    "message": " AI Sites"   
+    "message": " AI Sites"
   },
   "saveSuccess": {
     "message": "Configuration saved"
@@ -41,9 +41,6 @@
   },
   "openPage": {
     "message": "Tab Mode"
-  },
-  "openInNewTab": {
-    "message": "Open in new tab"
   },
   "commandDescription": {
     "message": "Hotkey: (⌘+M on Mac, Ctrl+M on Windows)"
@@ -183,9 +180,6 @@
   "disabledSitesDescription": {
     "message": "Manage websites where the floating button is disabled. You can re-enable the floating button here."
   },
-  "noDisabledSites": {
-    "message": "No disabled websites"
-  },
   "searchProviderName": {
     "message": "AI Compare"
   },
@@ -276,19 +270,6 @@
   "historyTitle": {
     "message": "History"
   },
-  "historyLink": {
-    "message": "History"
-  },
-  "favoritesLink": {
-    "message": "Favorites"
-  },
-  "settingsLink": {
-    "message": "Settings"
-  },
-  "favoriteAllSites": {
-    "message": "Favorite All Sites",
-    "description": "Tooltip for the favorite all sites button"
-  },
   "historyMaxRecordsTip": {
     "message": "Only the latest $COUNT$ records are saved",
     "placeholders": {
@@ -353,11 +334,5 @@
   },
   "noSitesSelected": {
     "message": "Please select at least one site"
-  },
-  "automationNotice": {
-    "message": "If websites are updated, the corresponding automated query functionality may become unavailable. We apologize for any inconvenience. If you discover any issues, please contact us for updates"
-  },
-  "reviewLink": {
-    "message": "⭐ Rate 5 Stars"
   }
 } 

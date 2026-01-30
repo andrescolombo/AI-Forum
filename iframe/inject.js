@@ -1393,7 +1393,7 @@ window.addEventListener('message', async function(event) {
     }
     
     // 只处理 AIShortcuts 扩展的特定消息类型
-    const validMultiAITypes = ['TRIGGER_PASTE', 'search', 'EXTRACT_CONTENT', 'SET_HISTORY_CONTEXT'];
+    const validMultiAITypes = ['TRIGGER_PASTE', 'search', 'EXTRACT_CONTENT', 'SET_HISTORY_CONTEXT', 'GET_CURRENT_URL'];
     
     if (!validMultiAITypes.includes(event.data.type)) {
         return;
@@ -1507,6 +1507,40 @@ window.addEventListener('message', async function(event) {
                 });
             }
         }
+        return;
+    }
+
+    // 处理获取当前 URL 消息
+    if (event.data.type === 'GET_CURRENT_URL') {
+        console.log('🎯 收到获取当前 URL 请求:', event.data);
+        
+        // 提取当前页面的URL（去掉locale等参数）
+        let pageUrl = window.location.href;
+        try {
+            // 查找alternate链接获取清洁的URL
+            const alternateLinks = document.querySelectorAll('link[rel="alternate"]');
+            for (const link of alternateLinks) {
+                const href = link.getAttribute('href');
+                if (href && href.includes('chatgpt.com/c/')) {
+                    const url = new URL(href);
+                    url.searchParams.delete('locale');
+                    pageUrl = url.toString();
+                    console.log(`🔗 从alternate标签获取清洁URL: ${pageUrl}`);
+                    break;
+                }
+            }
+        } catch (error) {
+            console.log('⚠️ URL清理失败，使用原始URL:', error);
+        }
+        
+        // 发送当前 URL 回父窗口
+        window.parent.postMessage({
+            type: 'GET_CURRENT_URL_RESPONSE',
+            siteName: event.data.siteName,
+            url: pageUrl
+        }, '*');
+        
+        console.log('✅ 已发送当前 URL:', pageUrl);
         return;
     }
 

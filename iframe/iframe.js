@@ -899,6 +899,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     createIframes(message.query, message.sites);
   } else if (message.type === 'loadHistoryIframes') {
     console.log('开始加载历史记录 iframes:', message.sites);
+    // 设置当前历史记录 ID（如果提供了）
+    if (message.historyId) {
+      window._currentHistoryId = message.historyId;
+      console.log('设置当前历史记录 ID:', message.historyId);
+    }
     loadHistoryIframes(message.sites);
   }
 });
@@ -1055,7 +1060,49 @@ async function getIframeLatestUrl(iframe, siteName, historyId = null) {
       console.log(`无法直接访问 ${siteName} iframe 的 location（可能跨域）`);
     }
     
-    // 方法2: 从历史记录中获取该站点的最新 URL（如果提供了 historyId 或存在当前历史记录 ID）
+    // 方法2: 尝试通过 postMessage 从 iframe 内部获取实际 URL
+    try {
+      const urlFromMessage = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          window.removeEventListener('message', messageHandler);
+          reject(new Error('获取 URL 超时'));
+        }, 1000); // 1秒超时
+        
+        const messageHandler = (event) => {
+          // 确保消息来自目标 iframe
+          if (event.source === iframe.contentWindow && 
+              event.data.type === 'GET_CURRENT_URL_RESPONSE' &&
+              event.data.siteName === siteName) {
+            clearTimeout(timeout);
+            window.removeEventListener('message', messageHandler);
+            resolve(event.data.url);
+          }
+        };
+        
+        window.addEventListener('message', messageHandler);
+        
+        // 发送请求到 iframe
+        try {
+          iframe.contentWindow.postMessage({
+            type: 'GET_CURRENT_URL',
+            siteName: siteName
+          }, '*');
+        } catch (postError) {
+          clearTimeout(timeout);
+          window.removeEventListener('message', messageHandler);
+          reject(postError);
+        }
+      });
+      
+      if (urlFromMessage && urlFromMessage !== 'about:blank') {
+        console.log(`通过 postMessage 获取 ${siteName} 的 URL:`, urlFromMessage);
+        return urlFromMessage;
+      }
+    } catch (e) {
+      console.log(`无法通过 postMessage 获取 ${siteName} 的 URL:`, e.message);
+    }
+    
+    // 方法3: 从历史记录中获取该站点的最新 URL（如果提供了 historyId 或存在当前历史记录 ID）
     const targetHistoryId = historyId || window._currentHistoryId;
     if (targetHistoryId) {
       const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
@@ -1069,7 +1116,7 @@ async function getIframeLatestUrl(iframe, siteName, historyId = null) {
       }
     }
     
-    // 方法3: 使用 iframe.src 作为后备
+    // 方法4: 使用 iframe.src 作为后备
     const srcUrl = iframe.src;
     if (srcUrl && srcUrl !== 'about:blank') {
       console.log(`使用 iframe.src 作为 ${siteName} 的 URL:`, srcUrl);
@@ -1284,11 +1331,18 @@ function createSingleIframe(siteName, url, container, query) {
   // 打开页面按钮点击事件
   openPageBtn.onclick = async (e) => {
     e.stopPropagation();
-    // 获取 iframe 的最新 URL
-    const iframeUrl = await getIframeLatestUrl(iframe, siteName);
+    // 获取 iframe 的最新 URL，传递历史记录 ID（如果存在）
+    const historyId = window._currentHistoryId || null;
+    const iframeUrl = await getIframeLatestUrl(iframe, siteName, historyId);
     if (iframeUrl) {
       // 在新标签页打开
       chrome.tabs.create({ url: iframeUrl });
+    } else {
+      console.warn(`无法获取 ${siteName} 的 URL，尝试使用 iframe.src`);
+      // 如果无法获取 URL，至少尝试使用 iframe.src
+      if (iframe.src && iframe.src !== 'about:blank') {
+        chrome.tabs.create({ url: iframe.src });
+      }
     }
   };
   
@@ -2215,11 +2269,18 @@ async function loadHistoryIframes(sites) {
       // 打开页面按钮点击事件
       openPageBtn.onclick = async (e) => {
         e.stopPropagation();
-        // 获取 iframe 的最新 URL
-        const iframeUrl = await getIframeLatestUrl(iframe, siteName);
+        // 获取 iframe 的最新 URL，传递历史记录 ID（如果存在）
+        const historyId = window._currentHistoryId || null;
+        const iframeUrl = await getIframeLatestUrl(iframe, siteName, historyId);
         if (iframeUrl) {
           // 在新标签页打开
           chrome.tabs.create({ url: iframeUrl });
+        } else {
+          console.warn(`无法获取 ${siteName} 的 URL，尝试使用 iframe.src`);
+          // 如果无法获取 URL，至少尝试使用 iframe.src
+          if (iframe.src && iframe.src !== 'about:blank') {
+            chrome.tabs.create({ url: iframe.src });
+          }
         }
       };
       
@@ -2295,6 +2356,111 @@ async function loadHistoryIframes(sites) {
   }
 }
 
+// 检查两个历史记录是否相同（基于 query 和 urlFeature）
+async function isHistoryDuplicate(newItem, existingItem) {
+  try {
+    // 首先检查 query 是否相同
+    if (newItem.query.trim() !== existingItem.query.trim()) {
+      return false;
+    }
+    
+    // 获取站点配置
+    let siteConfigs = [];
+    try {
+      if (window.getDefaultSites) {
+        siteConfigs = await window.getDefaultSites();
+      } else if (window.siteDetector) {
+        // 如果使用 siteDetector，需要获取所有站点配置
+        siteConfigs = await window.siteDetector.getSites();
+      }
+    } catch (error) {
+      console.warn('获取站点配置失败，跳过 urlFeature 对比:', error);
+      return false;
+    }
+    
+    // 检查每个站点是否匹配
+    const newSites = newItem.sites || [];
+    const existingSites = existingItem.sites || [];
+    
+    // 如果站点数量不同，认为不是重复
+    if (newSites.length !== existingSites.length) {
+      return false;
+    }
+    
+    // 对每个站点进行匹配检查
+    for (const newSite of newSites) {
+      const existingSite = existingSites.find(s => s.name === newSite.name);
+      if (!existingSite) {
+        return false; // 站点名称不匹配
+      }
+      
+      // 获取该站点的配置
+      const siteConfig = siteConfigs.find(s => s.name === newSite.name);
+      if (siteConfig && siteConfig.historyHandler && siteConfig.historyHandler.urlFeature) {
+        // 如果配置了 urlFeature，需要检查 URL 是否包含相同的 urlFeature
+        const urlFeature = siteConfig.historyHandler.urlFeature;
+        
+        // 提取新站点和现有站点的 URL pathname
+        let newPathname = '';
+        let existingPathname = '';
+        
+        try {
+          if (newSite.url) {
+            const newUrlObj = new URL(newSite.url);
+            newPathname = newUrlObj.pathname;
+          }
+        } catch (e) {
+          // URL 可能为空或无效，继续处理
+        }
+        
+        try {
+          if (existingSite.url) {
+            const existingUrlObj = new URL(existingSite.url);
+            existingPathname = existingUrlObj.pathname;
+          }
+        } catch (e) {
+          // URL 可能为空或无效，继续处理
+        }
+        
+        // 如果两个 URL 都包含相同的 urlFeature，认为是重复
+        if (newPathname && existingPathname) {
+          const newHasFeature = newPathname.includes(urlFeature);
+          const existingHasFeature = existingPathname.includes(urlFeature);
+          
+          // 如果都包含 urlFeature，认为是重复
+          if (newHasFeature && existingHasFeature) {
+            continue; // 这个站点匹配，继续检查下一个
+          }
+          
+          // 如果都不包含 urlFeature，也认为可能匹配（URL 可能还未更新）
+          if (!newHasFeature && !existingHasFeature) {
+            continue; // 这个站点可能匹配，继续检查下一个
+          }
+          
+          // 一个包含一个不包含，认为不匹配
+          return false;
+        } else if (!newPathname && !existingPathname) {
+          // 两个 URL 都为空，认为可能匹配
+          continue;
+        } else {
+          // 一个为空一个不为空，认为不匹配
+          return false;
+        }
+      } else {
+        // 如果没有配置 urlFeature，只检查站点名称是否相同
+        // 站点名称已经匹配，继续检查下一个
+        continue;
+      }
+    }
+    
+    // 所有站点都匹配，认为是重复记录
+    return true;
+  } catch (error) {
+    console.error('检查历史记录重复失败:', error);
+    return false;
+  }
+}
+
 // 保存 PK 历史记录
 async function savePKHistory(query) {
   try {
@@ -2308,13 +2474,72 @@ async function savePKHistory(query) {
       return null; // 如果没有 iframe，不保存
     }
     
+    // 获取站点配置，用于检查 urlFeature
+    let siteConfigs = [];
+    try {
+      if (window.getDefaultSites) {
+        siteConfigs = await window.getDefaultSites();
+      } else if (window.siteDetector) {
+        siteConfigs = await window.siteDetector.getSites();
+      }
+    } catch (error) {
+      console.warn('获取站点配置失败:', error);
+    }
+    
     // 收集所有站点的名称和 URL（尝试立即获取，如果获取不到则留空，由后续消息通信更新）
+    // 如果配置了 urlFeature，只保存包含 urlFeature 的 URL
     const sites = [];
     for (const iframe of iframes) {
       const siteName = iframe.getAttribute('data-site');
       if (siteName) {
         // 尝试立即获取 iframe 的最新 URL
         const url = await getIframeLatestUrl(iframe, siteName);
+        
+        // 获取该站点的配置
+        const siteConfig = siteConfigs.find(s => s.name === siteName);
+        
+        // 如果配置了 urlFeature，检查 URL 是否包含它
+        if (siteConfig && siteConfig.historyHandler && siteConfig.historyHandler.urlFeature) {
+          const urlFeature = siteConfig.historyHandler.urlFeature;
+          
+          // 如果 URL 不为空，检查是否包含 urlFeature
+          if (url) {
+            try {
+              const urlObj = new URL(url);
+              const pathname = urlObj.pathname;
+              
+              // 如果 URL 不包含 urlFeature，不保存该 URL（留空，等待后续更新）
+              if (!pathname.includes(urlFeature)) {
+                console.log(`⚠️ ${siteName} 的 URL 不包含 urlFeature "${urlFeature}"，不保存该 URL（等待后续更新）: ${url}`);
+                sites.push({
+                  name: siteName,
+                  url: '', // 留空，等待后续通过消息更新
+                  isFavorite: false
+                });
+                continue;
+              }
+            } catch (e) {
+              console.warn(`解析 ${siteName} 的 URL 失败: ${url}`, e);
+              // URL 格式错误，留空
+              sites.push({
+                name: siteName,
+                url: '',
+                isFavorite: false
+              });
+              continue;
+            }
+          } else {
+            // URL 为空，留空等待后续更新
+            sites.push({
+              name: siteName,
+              url: '',
+              isFavorite: false
+            });
+            continue;
+          }
+        }
+        
+        // 如果未配置 urlFeature，或者 URL 包含 urlFeature，正常保存
         sites.push({
           name: siteName,
           url: url || '', // 如果获取不到 URL，留空，由后续消息通信更新
@@ -2328,7 +2553,7 @@ async function savePKHistory(query) {
     }
     
     // 创建历史记录项（尝试立即获取 URL，如果获取不到则由各 iframe 内部脚本检测并更新）
-    const historyId = Date.now().toString();
+    let historyId = Date.now().toString();
     const historyItem = {
       id: historyId,
       query: query.trim(),
@@ -2346,8 +2571,54 @@ async function savePKHistory(query) {
     // 从存储中获取现有历史记录
     const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
     
-    // 将新记录添加到开头
-    const updatedHistory = [historyItem, ...pkHistory];
+    // 检查是否存在重复记录（基于 query 和 urlFeature）
+    let existingHistoryId = null;
+    for (const existingItem of pkHistory) {
+      const isDuplicate = await isHistoryDuplicate(historyItem, existingItem);
+      if (isDuplicate) {
+        existingHistoryId = existingItem.id;
+        console.log('发现重复的历史记录，将更新现有记录:', existingItem.id);
+        break;
+      }
+    }
+    
+    let updatedHistory;
+    if (existingHistoryId) {
+      // 如果存在重复记录，更新现有记录而不是创建新记录
+      updatedHistory = pkHistory.map(item => {
+        if (item.id === existingHistoryId) {
+          // 更新现有记录的时间戳和日期
+          return {
+            ...item,
+            timestamp: Date.now(),
+            date: new Date().toLocaleString('zh-CN', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+            }),
+            // 更新站点 URL（如果新记录的 URL 更完整）
+            sites: item.sites.map(existingSite => {
+              const newSite = historyItem.sites.find(s => s.name === existingSite.name);
+              if (newSite && newSite.url && (!existingSite.url || existingSite.url === '')) {
+                return { ...existingSite, url: newSite.url };
+              }
+              return existingSite;
+            })
+          };
+        }
+        return item;
+      });
+      // 将更新的记录移到最前面
+      const updatedItem = updatedHistory.find(item => item.id === existingHistoryId);
+      updatedHistory = updatedHistory.filter(item => item.id !== existingHistoryId);
+      updatedHistory = [updatedItem, ...updatedHistory];
+      historyId = existingHistoryId; // 使用现有记录的 ID
+    } else {
+      // 如果没有重复，将新记录添加到开头
+      updatedHistory = [historyItem, ...pkHistory];
+    }
     
     // 限制历史记录数量（从 appConfig.json 读取配置）
     let maxHistory = 100; // 默认值
@@ -2369,7 +2640,11 @@ async function savePKHistory(query) {
     // 将历史记录 ID 存储到全局变量，供 iframe 内部脚本更新 URL 时使用
     window._currentHistoryId = historyId;
     
-    console.log('PK 历史记录已创建（待 iframe 更新 URL）:', historyItem);
+    if (existingHistoryId) {
+      console.log('PK 历史记录已更新（待 iframe 更新 URL）:', historyItem);
+    } else {
+      console.log('PK 历史记录已创建（待 iframe 更新 URL）:', historyItem);
+    }
     return historyId;
   } catch (error) {
     console.error('保存 PK 历史记录失败:', error);
@@ -2380,6 +2655,47 @@ async function savePKHistory(query) {
 // 更新历史记录中特定站点的 URL
 async function updateHistorySiteUrl(siteName, url, historyId) {
   try {
+    // 获取站点配置，检查 urlFeature
+    let siteConfigs = [];
+    try {
+      if (window.getDefaultSites) {
+        siteConfigs = await window.getDefaultSites();
+      } else if (window.siteDetector) {
+        siteConfigs = await window.siteDetector.getSites();
+      }
+    } catch (error) {
+      console.warn('获取站点配置失败:', error);
+    }
+    
+    // 获取该站点的配置
+    const siteConfig = siteConfigs.find(s => s.name === siteName);
+    
+    // 如果配置了 urlFeature，检查 URL 是否包含它
+    if (siteConfig && siteConfig.historyHandler && siteConfig.historyHandler.urlFeature) {
+      const urlFeature = siteConfig.historyHandler.urlFeature;
+      
+      if (!url) {
+        // URL 为空，不更新
+        console.log(`⚠️ ${siteName} 配置了 urlFeature "${urlFeature}" 但 URL 为空，不更新历史记录`);
+        return;
+      }
+      
+      try {
+        const urlObj = new URL(url);
+        const pathname = urlObj.pathname;
+        
+        // 如果 URL 不包含 urlFeature，不更新
+        if (!pathname.includes(urlFeature)) {
+          console.log(`⚠️ ${siteName} 的 URL 不包含 urlFeature "${urlFeature}"，不更新历史记录: ${url}`);
+          return;
+        }
+      } catch (e) {
+        console.warn(`解析 ${siteName} 的 URL 失败: ${url}`, e);
+        // URL 格式错误，不更新
+        return;
+      }
+    }
+    
     // 从存储中获取历史记录
     const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
     
@@ -2410,6 +2726,48 @@ async function updateHistorySiteUrl(siteName, url, historyId) {
       // 创建新的站点项，默认 isFavorite 为 false
       siteItem = { name: siteName, url: url, isFavorite: false };
       historyItem.sites.push(siteItem);
+    }
+    
+    // 检查历史记录中是否至少有一个站点的 URL 包含 urlFeature
+    // 如果所有站点的 URL 都不包含 urlFeature，删除该历史记录
+    let hasValidUrl = false;
+    for (const site of historyItem.sites) {
+      const siteCfg = siteConfigs.find(s => s.name === site.name);
+      if (siteCfg && siteCfg.historyHandler && siteCfg.historyHandler.urlFeature) {
+        const urlFeature = siteCfg.historyHandler.urlFeature;
+        if (site.url) {
+          try {
+            const urlObj = new URL(site.url);
+            if (urlObj.pathname.includes(urlFeature)) {
+              hasValidUrl = true;
+              break;
+            }
+          } catch (e) {
+            // URL 格式错误，跳过
+          }
+        }
+      } else {
+        // 如果站点未配置 urlFeature，认为该站点有效
+        hasValidUrl = true;
+        break;
+      }
+    }
+    
+    // 如果所有站点的 URL 都不包含 urlFeature，删除该历史记录
+    if (!hasValidUrl && historyItem.sites.length > 0) {
+      // 检查是否所有站点都配置了 urlFeature
+      const allSitesHaveUrlFeature = historyItem.sites.every(site => {
+        const siteCfg = siteConfigs.find(s => s.name === site.name);
+        return siteCfg && siteCfg.historyHandler && siteCfg.historyHandler.urlFeature;
+      });
+      
+      if (allSitesHaveUrlFeature) {
+        // 所有站点都配置了 urlFeature，但没有任何站点的 URL 包含 urlFeature，删除该历史记录
+        pkHistory.splice(historyIndex, 1);
+        console.log(`🗑️ 历史记录 ${historyId} 的所有站点 URL 都不包含 urlFeature，删除整条记录`);
+        await chrome.storage.local.set({ pkHistory: pkHistory });
+        return;
+      }
     }
     
     // 保存更新后的历史记录
