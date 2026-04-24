@@ -1,10 +1,10 @@
-# 🧠 AI Forum — One-Click to compare answers from multiple AIs
+# 🧠 AI-Forum — One-Click to compare answers from multiple AIs
 
 ---
 
 ## ✨ Introduction
 
-**AI Forum** (formerly "AI Compare") is a browser extension that lets you compare answers from multiple AI models in one place. Enter a query once and see results from ChatGPT, Gemini, Claude, Grok, DeepSeek, Kimi, Doubao, Tencent Yuanbao, and many more — side by side. You use your existing AI accounts; the extension does not require sign-up or paid membership.
+**AI-Forum** (formerly "AI Compare") is a browser extension that lets you compare answers from multiple AI models in one place. Enter a query once and see results from ChatGPT, Gemini, Claude, Grok, DeepSeek, Kimi, Doubao, Tencent Yuanbao, and many more — side by side. You use your existing AI accounts; the extension does not require sign-up or paid membership.
 
 ### 📦 Features
 

@@ -304,8 +304,8 @@
     },
     {
       "name": "Claude",
-      "url": "https://claude.ai/chat",
-      "enabled": false,
+      "url": "https://claude.ai/new",
+      "enabled": true,
       "supportUrlQuery": false,
       "region": "US",
       "hidden": false,
@@ -315,53 +315,66 @@
         "steps": [
           {
             "action": "wait",
-            "duration": 100,
-            "description": "Wait100ms"
+            "duration": 500,
+            "description": "Wait for Claude to load"
           },
           {
             "action": "focus",
-            "selector": "[contenteditable=\"true\"]",
+            "selector": [
+              "div.ProseMirror[contenteditable=\"true\"]",
+              "[contenteditable=\"true\"][data-placeholder]",
+              "[contenteditable=\"true\"]"
+            ],
             "waitForElement": true,
-            "maxAttempts": 10,
-            "retryInterval": 200,
-            "description": "Focus可编辑区域（支持重试）"
+            "maxAttempts": 15,
+            "retryInterval": 300,
+            "description": "Focus Claude input"
           },
           {
             "action": "setValue",
-            "selector": "[contenteditable=\"true\"]",
+            "selector": [
+              "div.ProseMirror[contenteditable=\"true\"]",
+              "[contenteditable=\"true\"][data-placeholder]",
+              "[contenteditable=\"true\"]"
+            ],
             "inputType": "contenteditable",
             "waitForElement": true,
             "maxAttempts": 5,
-            "retryInterval": 200,
-            "description": "Settings可编辑区域内容（支持重试）"
+            "retryInterval": 300,
+            "description": "Set Claude input content"
           },
           {
             "action": "triggerEvents",
-            "selector": "[contenteditable=\"true\"]",
+            "selector": [
+              "div.ProseMirror[contenteditable=\"true\"]",
+              "[contenteditable=\"true\"]"
+            ],
             "events": ["input", "change", "blur", "focus"],
             "waitForElement": true,
             "maxAttempts": 5,
             "retryInterval": 200,
-            "description": "Trigger输入事件（支持重试）"
+            "description": "Trigger input events"
           },
           {
             "action": "wait",
-            "duration": 100,
-            "description": "Wait100ms"
+            "duration": 300,
+            "description": "Wait for send button to activate"
           },
           {
             "action": "click",
             "selector": [
               "button[aria-label=\"Send message\"]",
-              "button[type=\"button\"][aria-label=\"Send message\"]",
+              "button[aria-label=\"Enviar mensaje\"]",
               "button[aria-label=\"Send Message\"]",
               "button[aria-label=\"Send\"]",
-              "button[data-testid=\"send-button\"]"
+              "button[aria-label=\"Enviar\"]",
+              "button[data-testid=\"send-button\"]",
+              "button[type=\"button\"]:not([disabled]):has(svg)"
             ],
-            "retryOnDisabled": true,
-            "maxAttempts": 5,
-            "retryInterval": 200,
-            "description": "ClickClaudeSend button（支持重试）"
+            "retryOnDisabled": false,
+            "maxAttempts": 8,
+            "retryInterval": 300,
+            "description": "Click Claude Send button (multilingual)"
           }
         ]
       },

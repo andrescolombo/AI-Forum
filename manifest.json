@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "__MSG_appName__",
+  "name": "AI-Forum",
   "version": "2.15.10",
-  "description": "__MSG_extDescription__",
+  "description": "AI-Forum helps you find the best answer from multiple AI quickly.",
   "permissions": [
     "storage",
     "activeTab",

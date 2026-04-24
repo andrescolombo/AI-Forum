@@ -1,12 +1,12 @@
 {
   "shortName": {
-    "message": "AI Compare"
+    "message": "AI-Forum"
   },
   "appName": {
-    "message": "AI Compare - OneClick to compare ChatGPT, Gemini, Grok and more."
+    "message": "AI-Forum - OneClick to compare ChatGPT, Gemini, Grok and more."
   },
   "extDescription": {
-    "message": "AI Compare helps you find the best answer from multiple AI quickly."
+    "message": "AI-Forum helps you find the best answer from multiple AI quickly."
   },
   "configTitle": {
     "message": " AI Sites"
@@ -26,10 +26,10 @@
     "message": "Enter content to search..."
   },
   "openSettings": {
-    "message": "AI Compare Settings"
+    "message": "AI-Forum Settings"
   },
   "searchWithMultiAI": {
-    "message": "Search with AI Compare"
+    "message": "Search with AI-Forum"
   },
   "startCompare": {
     "message": "PK",
@@ -49,7 +49,7 @@
     "message": "If you want to add more sites, please contact me at AIShortcuts@outlook.com"
   },
   "popupTitle": {
-    "message": "AI Compare"
+    "message": "AI-Forum"
   },
   "column1": {
     "message": "1 Col",
