@@ -666,8 +666,12 @@ async function executeFileUploadSequentially(iframes, fileData, fallbackMode = f
       // 给 iframe 一些时间来准备接收
       await new Promise(resolve => setTimeout(resolve, 200));
       
+      // Phase 1 Security Fix: Use specific iframe origin instead of wildcard '*'.
+      // This prevents other pages from intercepting these postMessages.
+      const iframeOrigin = new URL(iframe.src).origin;
+
       if (fallbackMode) {
-        // 降级模式：让 iframe 自己尝试读取剪贴板
+        // Fallback mode: let the iframe try to read the clipboard itself
         iframe.contentWindow.postMessage({
           type: 'TRIGGER_PASTE',
           domain: domain,
@@ -676,19 +680,19 @@ async function executeFileUploadSequentially(iframes, fileData, fallbackMode = f
           fallback: true,
           index: i + 1,
           total: totalIframes
-        }, '*');
+        }, iframeOrigin);
       } else {
-        // 优先模式：使用站点特定的文件上传处理器
+        // Priority mode: use site-specific file upload handler
         iframe.contentWindow.postMessage({
           type: 'TRIGGER_PASTE',
           domain: domain,
           source: 'iframe-parent',
           global: true,
-          fileData: fileData, // 传递文件数据供站点处理器使用
-          useSiteHandler: true, // 标记使用站点处理器
+          fileData: fileData,
+          useSiteHandler: true,
           index: i + 1,
           total: totalIframes
-        }, '*');
+        }, iframeOrigin);
       }
       
       // 等待一段时间让 iframe 处理完成

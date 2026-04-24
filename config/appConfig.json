@@ -20,7 +20,8 @@
   },
   "analytics": {
     "enabled": false,
-    "measurementId": "G-JP9L38KMWN",
+    "comment": "Phase 1 Security Fix: Analytics permanently disabled. MeasurementId cleared to prevent accidental activation.",
+    "measurementId": "",
     "apiSecret": ""
   },
   "history": {

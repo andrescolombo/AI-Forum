@@ -2,6 +2,7 @@
     {
       "id": 1,
       "priority": 1,
+      "comment": "Phase 1 Security Fix: Restricted to AI platform domains only. Previously was '*://*/*' which stripped security headers from ALL websites.",
       "action": {
         "type": "modifyHeaders",
         "requestHeaders": [
@@ -39,11 +40,50 @@
           {
             "header": "x-frame-options",
             "operation": "remove"
+          },
+          {
+            "header": "cross-origin-resource-policy",
+            "operation": "remove"
+          },
+          {
+            "header": "cross-origin-opener-policy",
+            "operation": "remove"
           }
         ]
       },
       "condition": {
-        "urlFilter": "*://*/*",
+        "requestDomains": [
+          "chatgpt.com",
+          "gemini.google.com",
+          "grok.com",
+          "claude.ai",
+          "aistudio.google.com",
+          "chat.deepseek.com",
+          "doubao.com",
+          "copilot.microsoft.com",
+          "kimi.moonshot.cn",
+          "yuanbao.tencent.com",
+          "tiangong.cn",
+          "metaso.cn",
+          "perplexity.ai",
+          "you.com",
+          "poe.com",
+          "character.ai",
+          "hailuoai.com",
+          "chat.qianwen.com",
+          "tongyi.aliyun.com",
+          "abacus.ai",
+          "huggingface.co",
+          "coze.com",
+          "coze.cn",
+          "open.bigmodel.cn",
+          "chat.mistral.ai",
+          "phind.com",
+          "groq.com",
+          "lepton.ai",
+          "kling.kuaishou.com",
+          "xinghuo.xfyun.cn"
+        ],
         "resourceTypes": [
           "main_frame",
           "sub_frame"

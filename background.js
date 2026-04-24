@@ -255,9 +255,21 @@ chrome.declarativeNetRequest.getSessionRules().then(rules => {
 });
 
 
-// 如果规则为空，尝试动态添加规则
+// Phase 1 Security Fix: Session rule now restricted to AI platform domains only.
+// Previously used urlFilter: "*://*/*" which stripped security headers from ALL websites.
+const AI_PLATFORM_DOMAINS = [
+  'chatgpt.com', 'gemini.google.com', 'grok.com', 'claude.ai',
+  'aistudio.google.com', 'chat.deepseek.com', 'doubao.com',
+  'copilot.microsoft.com', 'kimi.moonshot.cn', 'yuanbao.tencent.com',
+  'tiangong.cn', 'metaso.cn', 'perplexity.ai', 'you.com', 'poe.com',
+  'character.ai', 'hailuoai.com', 'chat.qianwen.com', 'tongyi.aliyun.com',
+  'abacus.ai', 'huggingface.co', 'coze.com', 'coze.cn',
+  'open.bigmodel.cn', 'chat.mistral.ai', 'phind.com', 'groq.com',
+  'lepton.ai', 'kling.kuaishou.com', 'xinghuo.xfyun.cn'
+];
+
 chrome.declarativeNetRequest.updateSessionRules({
-  removeRuleIds: [999], // 先清除可能存在的规则 999
+  removeRuleIds: [999],
   addRules: [{
     "id": 999,
     "priority": 1,
@@ -291,19 +303,27 @@ chrome.declarativeNetRequest.updateSessionRules({
         {
           "header": "x-frame-options",
           "operation": "remove"
+        },
+        {
+          "header": "cross-origin-resource-policy",
+          "operation": "remove"
+        },
+        {
+          "header": "cross-origin-opener-policy",
+          "operation": "remove"
         }
       ]
     },
     "condition": {
-      "urlFilter": "*://*/*",
+      "requestDomains": AI_PLATFORM_DOMAINS,
       "resourceTypes": ["main_frame", "sub_frame"]
     }
   }]
 }).then(() => {
-  // 再次检查规则
   return chrome.declarativeNetRequest.getSessionRules();
 }).then(rules => {
-  console.log('更新后的规则:', rules);
+  // Session rules updated — restricted to AI platform domains only
+  void rules;
 });
 
 

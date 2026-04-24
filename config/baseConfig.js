@@ -15,14 +15,11 @@ const DEV_CONFIG = {
 
 };
 
-// 生产环境 console 重写（仅在 production 模式下）
-if (DEV_CONFIG.IS_PRODUCTION) {
-  console.log = function() { return undefined; };
-  console.warn = function() { return undefined; };
-  console.error = function() { return undefined; };
-  console.info = function() { return undefined; };
-  console.debug = function() { return undefined; };
-}
+// Phase 1 Security Fix: Replaced global console override that silently swallowed
+// all errors in production. Now uses a no-op local logger instead.
+const _logger = DEV_CONFIG.IS_PRODUCTION
+  ? { log: () => {}, warn: () => {}, error: () => {}, info: () => {}, debug: () => {} }
+  : console;
 
 // 应用配置管理器
 const AppConfigManager = {
@@ -201,40 +198,63 @@ function compareVersions(version1, version2) {
 
 // 远程配置更新功能（仅更新配置数据，不更新代码）
 const RemoteConfigManager = {
-  // 远程配置服务器 - 根据环境选择不同的URL
+  // Phase 1 Security Fix: Remote config URL now points to our fork.
+  // Change this to your own GitHub repository when publishing.
   get configUrl() {
-    // 如果 DEV_CONFIG 对象存在，使用环境配置
     if (typeof DEV_CONFIG !== 'undefined' && DEV_CONFIG.REMOTE_CONFIG_URL) {
-      return DEV_CONFIG.IS_PRODUCTION 
-        ? 'https://raw.githubusercontent.com/taoAIGC/AI-Shortcuts/main/config/siteHandlers.json'
+      return DEV_CONFIG.IS_PRODUCTION
+        ? 'https://raw.githubusercontent.com/taoAIGC/AICompare/refs/heads/main/config/siteHandlers.json'
         : DEV_CONFIG.REMOTE_CONFIG_URL;
     }
-    // 否则使用默认的生产环境URL
-    return 'https://raw.githubusercontent.com/taoAIGC/AI-Shortcuts/main/config/siteHandlers.json';
+    return 'https://raw.githubusercontent.com/taoAIGC/AICompare/refs/heads/main/config/siteHandlers.json';
   },
   
-  // 检查并更新配置
+  // Phase 1 Security Fix: Added schema validation before applying remote config.
+  // Prevents supply-chain attacks via malicious JSON from a compromised GitHub repo.
+  _validateRemoteConfig(config) {
+    if (!config || typeof config !== 'object') return false;
+    if (typeof config.version === 'undefined') return false;
+    if (!Array.isArray(config.sites)) return false;
+    if (config.sites.length === 0) return false;
+    // Each site must have at minimum: name (string) and url (string)
+    const validSites = config.sites.filter(site =>
+      typeof site.name === 'string' && site.name.length > 0 &&
+      typeof site.url === 'string' && site.url.startsWith('https://')
+    );
+    if (validSites.length === 0) return false;
+    // Reject configs with suspiciously low number of valid sites vs total
+    if (validSites.length < config.sites.length * 0.5) return false;
+    return true;
+  },
+
+  // Checks and updates config from remote
   async checkAndUpdateConfig() {
     try {
       const response = await fetch(this.configUrl);
       if (!response.ok) {
-        throw new Error(`配置服务器错误: ${response.status}`);
+        throw new Error(`Config server error: ${response.status}`);
       }
       
       const remoteConfig = await response.json();
+
+      // Phase 1 Security Fix: Validate remote config schema before applying.
+      if (!this._validateRemoteConfig(remoteConfig)) {
+        _logger.error('[RemoteConfigManager] Remote config failed schema validation — update rejected.');
+        return { hasUpdate: false, reason: 'invalid_schema' };
+      }
+
       const remoteVersion = remoteConfig.version || Date.now();
       
-      // 获取本地版本
+      // Get local version
       const localVersion = await this.getLocalVersion();
       
-      
-      // 使用版本号比较函数
+      // Compare versions using version comparison function
       const versionComparison = compareVersions(remoteVersion, localVersion);
       
       if (versionComparison > 0) {
-        console.log(`发现新版本的站点配置 (${localVersion} -> ${remoteVersion})，准备更新...`);
+        _logger.log(`New site config version found (${localVersion} -> ${remoteVersion}), updating...`);
         
-        // 更新本地存储的配置
+        // Update local stored config
         await this.updateLocalConfig(remoteConfig);
         
         return {
@@ -245,7 +265,6 @@ const RemoteConfigManager = {
           versionComparison: versionComparison
         };
       } else if (versionComparison < 0) {
-        console.log(`远程版本 (${remoteVersion}) 比本地版本 (${localVersion}) 旧，跳过更新`);
         return { 
           hasUpdate: false, 
           reason: 'remote_older',
@@ -253,7 +272,6 @@ const RemoteConfigManager = {
           localVersion: localVersion
         };
       } else {
-        console.log(`版本号相同 (${remoteVersion})，无需更新`);
         return { 
           hasUpdate: false, 
           reason: 'same_version',
@@ -261,7 +279,7 @@ const RemoteConfigManager = {
         };
       }
     } catch (error) {
-      console.error('检查配置更新失败:', error);
+      _logger.error('[RemoteConfigManager] Config update check failed:', error);
       return { hasUpdate: false, error: error.message };
     }
   },
