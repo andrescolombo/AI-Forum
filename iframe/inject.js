@@ -528,8 +528,14 @@ async function executeSetValue(step, query) {
   element = await trySetValue();
 
   if (step.inputType === 'contenteditable') {
-    
-    const isLexicalEditor = element.hasAttribute('data-lexical-editor') || 
+
+    // If a customSetValue strategy is specified, route to the legacy handler
+    if (step.customSetValue) {
+      await executeLegacySpecialSetValue(step, query);
+      return;
+    }
+
+    const isLexicalEditor = element.hasAttribute('data-lexical-editor') ||
                            element.getAttribute('data-lexical-editor') === 'true';
     
     if (isLexicalEditor) {
@@ -959,6 +965,49 @@ async function executeLegacySpecialSetValue(step, query) {
         textarea.value = query;
       }
     }
+  } else if (step.customSetValue === 'prosemirror') {
+    // ProseMirror / Tiptap editor (used by Claude)
+    // The correct method: focus, select all, then use execCommand insertText
+    // This triggers ProseMirror's internal state update which enables the send button
+    const selectors = Array.isArray(step.selector) ? step.selector : [step.selector];
+    let editor = null;
+    for (const sel of selectors) {
+      editor = document.querySelector(sel);
+      if (editor) break;
+    }
+    if (!editor) {
+      throw new Error('ProseMirror editor element not found');
+    }
+
+    // Step 1: Focus the editor
+    editor.focus();
+    await new Promise(r => setTimeout(r, 100));
+
+    // Step 2: Select all existing content
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    // Step 3: Use execCommand to replace content — ProseMirror listens to this
+    try {
+      document.execCommand('insertText', false, query);
+      console.log('ProseMirror: text inserted via execCommand insertText');
+    } catch (e) {
+      // Fallback: direct DOM manipulation + input event
+      editor.innerHTML = '<p>' + query.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>';
+      editor.dispatchEvent(new InputEvent('input', {
+        bubbles: true, cancelable: true, inputType: 'insertText', data: query
+      }));
+      console.log('ProseMirror: text inserted via innerHTML fallback');
+    }
+
+    // Step 4: Dispatch input event to ensure React/ProseMirror picks up the change
+    editor.dispatchEvent(new InputEvent('input', {
+      bubbles: true, cancelable: true, inputType: 'insertText', data: query
+    }));
+    await new Promise(r => setTimeout(r, 200));
   }
 }
 

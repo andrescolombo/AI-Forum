@@ -325,55 +325,39 @@
         "steps": [
           {
             "action": "wait",
-            "duration": 500,
-            "description": "Wait for Claude to load"
+            "duration": 800,
+            "description": "Wait for Claude editor to be ready"
           },
           {
             "action": "focus",
             "selector": [
+              ".tiptap.ProseMirror",
               "div.ProseMirror[contenteditable=\"true\"]",
-              "[contenteditable=\"true\"][data-placeholder]",
               "[contenteditable=\"true\"]"
             ],
             "waitForElement": true,
             "maxAttempts": 15,
             "retryInterval": 300,
-            "description": "Focus Claude input"
+            "description": "Focus Claude ProseMirror input"
           },
           {
             "action": "setValue",
             "selector": [
+              ".tiptap.ProseMirror",
               "div.ProseMirror[contenteditable=\"true\"]",
-              "[contenteditable=\"true\"][data-placeholder]",
               "[contenteditable=\"true\"]"
             ],
             "inputType": "contenteditable",
+            "customSetValue": "prosemirror",
             "waitForElement": true,
             "maxAttempts": 5,
             "retryInterval": 300,
-            "description": "Set Claude input content"
-          },
-          {
-            "action": "triggerEvents",
-            "selector": [
-              "div.ProseMirror[contenteditable=\"true\"]",
-              "[contenteditable=\"true\"]"
-            ],
-            "events": [
-              "input",
-              "change",
-              "blur",
-              "focus"
-            ],
-            "waitForElement": true,
-            "maxAttempts": 5,
-            "retryInterval": 200,
-            "description": "Trigger input events"
+            "description": "Set text in Claude ProseMirror editor"
           },
           {
             "action": "wait",
-            "duration": 300,
-            "description": "Wait for send button to activate"
+            "duration": 500,
+            "description": "Wait for React to process the input and enable send button"
           },
           {
             "action": "click",
@@ -383,13 +367,24 @@
               "button[aria-label=\"Send Message\"]",
               "button[aria-label=\"Send\"]",
               "button[aria-label=\"Enviar\"]",
-              "button[data-testid=\"send-button\"]",
-              "button[type=\"button\"]:not([disabled]):has(svg)"
+              "button[data-testid=\"send-button\"]"
             ],
             "retryOnDisabled": false,
-            "maxAttempts": 8,
+            "maxAttempts": 10,
             "retryInterval": 300,
+            "required": false,
             "description": "Click Claude Send button (multilingual)"
+          },
+          {
+            "action": "sendKeys",
+            "selector": [
+              ".tiptap.ProseMirror",
+              "div.ProseMirror[contenteditable=\"true\"]",
+              "[contenteditable=\"true\"]"
+            ],
+            "keys": "Enter",
+            "required": false,
+            "description": "Fallback: press Enter to send"
           }
         ]
       },
