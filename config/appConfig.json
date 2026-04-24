@@ -28,7 +28,7 @@
     "maxCount": 100
   },
   "supportedFileTypes": {
-    "description": "文件粘贴功能支持的文件类型配置",
+    "description": "文件粘贴功能支持的文件类型Config",
     "categories": {
       "general": {
         "name": "通用文件类型",

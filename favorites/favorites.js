@@ -1,32 +1,32 @@
-// 存储所有收藏记录数据
+
 let allFavoriteItems = [];
 
-// 页面加载完成后初始化
+
 document.addEventListener('DOMContentLoaded', async () => {
     await loadFavorites();
     
-    // 绑定清空收藏按钮事件
+    
     const clearBtn = document.getElementById('clearFavoritesBtn');
     clearBtn.addEventListener('click', async () => {
-        if (confirm('确定要清空所有收藏记录吗？')) {
+        if (confirm('确定要清空所有Favorites记录吗？')) {
             await clearAllFavorites();
             await loadFavorites();
         }
     });
     
-    // 绑定搜索输入框事件
+    
     const searchInput = document.getElementById('searchInput');
     searchInput.addEventListener('input', (e) => {
         filterFavorites(e.target.value);
     });
 });
 
-// 加载收藏记录（从历史记录中筛选包含收藏站点的记录）
+
 async function loadFavorites() {
     try {
         const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
         
-        // 筛选包含收藏站点的历史记录，且每条记录的 sites 仅保留 isFavorite === true 的站点
+        
         const favoriteItems = pkHistory
             .filter(item => item.sites && item.sites.some(site => site.isFavorite === true))
             .map(item => ({
@@ -34,7 +34,7 @@ async function loadFavorites() {
                 sites: item.sites.filter(site => site.isFavorite === true)
             }));
         
-        // 保存所有收藏记录
+        
         allFavoriteItems = favoriteItems;
         
         const favoritesList = document.getElementById('favoritesList');
@@ -42,10 +42,10 @@ async function loadFavorites() {
         const noResultsState = document.getElementById('noResultsState');
         const searchInput = document.getElementById('searchInput');
         
-        // 获取当前搜索关键词
+        
         const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
         
-        // 根据搜索关键词过滤
+        
         const filteredItems = filterItemsBySearch(favoriteItems, searchTerm);
         
         if (favoriteItems.length === 0) {
@@ -66,31 +66,31 @@ async function loadFavorites() {
         emptyState.style.display = 'none';
         noResultsState.style.display = 'none';
         
-        // 清空现有内容
+        
         favoritesList.innerHTML = '';
         
-        // 渲染收藏记录
+        
         filteredItems.forEach(item => {
             const favoriteItem = createFavoriteItem(item);
             favoritesList.appendChild(favoriteItem);
         });
         
     } catch (error) {
-        console.error('加载收藏记录失败:', error);
+        console.error('LoadFavorites记录Failed:', error);
     }
 }
 
-// 根据搜索关键词过滤收藏记录
+
 function filterItemsBySearch(items, searchTerm) {
     if (!searchTerm) {
         return items;
     }
     
     return items.filter(item => {
-        // 搜索查询关键词
+        
         const queryMatch = item.query && item.query.toLowerCase().includes(searchTerm);
         
-        // 搜索站点名称
+        
         const siteMatch = item.sites && item.sites.some(site => 
             site.name && site.name.toLowerCase().includes(searchTerm)
         );
@@ -99,7 +99,7 @@ function filterItemsBySearch(items, searchTerm) {
     });
 }
 
-// 过滤收藏记录
+
 function filterFavorites(searchTerm) {
     const filteredItems = filterItemsBySearch(allFavoriteItems, searchTerm.toLowerCase());
     
@@ -125,22 +125,22 @@ function filterFavorites(searchTerm) {
     emptyState.style.display = 'none';
     noResultsState.style.display = 'none';
     
-    // 清空现有内容
+    
     favoritesList.innerHTML = '';
     
-    // 渲染过滤后的收藏记录
+    
     filteredItems.forEach(item => {
         const favoriteItem = createFavoriteItem(item);
         favoritesList.appendChild(favoriteItem);
     });
 }
 
-// 创建收藏记录项
+
 function createFavoriteItem(item) {
     const div = document.createElement('div');
     div.className = 'favorite-item';
     
-    // 创建头部
+    
     const header = document.createElement('div');
     header.className = 'favorite-item-header';
     
@@ -160,7 +160,7 @@ function createFavoriteItem(item) {
     deleteBtn.textContent = 'Delete';
     deleteBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (confirm('确定要删除这条收藏记录吗？')) {
+        if (confirm('确定要删除这条Favorites记录吗？')) {
             await deleteFavoriteItem(item.id);
             await loadFavorites();
         }
@@ -172,7 +172,7 @@ function createFavoriteItem(item) {
     header.appendChild(dateDiv);
     header.appendChild(actionsDiv);
     
-    // 创建站点标签（item.sites 已仅含 isFavorite === true 的站点）
+    
     const sitesDiv = document.createElement('div');
     sitesDiv.className = 'favorite-sites';
     
@@ -183,13 +183,13 @@ function createFavoriteItem(item) {
         sitesDiv.appendChild(tag);
     });
     
-    // 组装元素
+    
     div.appendChild(header);
     div.appendChild(sitesDiv);
     
-    // 点击收藏记录项时打开对应的站点
+    
     div.addEventListener('click', (e) => {
-        // 如果点击的是删除按钮，不触发打开操作
+        
         if (e.target === deleteBtn || deleteBtn.contains(e.target)) {
             return;
         }
@@ -200,68 +200,68 @@ function createFavoriteItem(item) {
     return div;
 }
 
-// 打开收藏记录项
+
 async function openFavoriteItem(item) {
     try {
-        // 构建 URL 参数
+        
         const params = new URLSearchParams();
         params.set('query', item.query);
         
-        // item.sites 已仅含 isFavorite === true 的站点
+        
         const siteNames = item.sites.map(site => site.name);
         if (siteNames.length > 0) {
             params.set('sites', siteNames.join(','));
         }
         
-        // 构建 iframe.html 的 URL
+        
         const iframeUrl = chrome.runtime.getURL(`iframe/iframe.html?${params.toString()}`);
         
-        // 打开新标签页
+        
         await chrome.tabs.create({
             url: iframeUrl,
             active: true
         });
         
-        // 等待标签页加载完成后，需要设置每个 iframe 的 URL
+        
         setTimeout(async () => {
-            // 获取当前窗口的所有标签页
+            
             const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
             if (tabs.length > 0) {
                 const currentTab = tabs[0];
                 if (currentTab.url && currentTab.url.includes('iframe.html')) {
-                    // 发送消息到 iframe.html，设置每个 iframe 的 URL（item.sites 仅含收藏站点）
+                    
                     try {
                         await chrome.tabs.sendMessage(currentTab.id, {
                             type: 'loadHistoryIframes',
                             sites: item.sites
                         });
                     } catch (error) {
-                        console.error('发送消息失败:', error);
-                        // 如果消息发送失败，可能是因为页面还没有完全加载
-                        // 这种情况下，iframe.html 会根据 query 和 sites 参数自动创建 iframe
+                        console.error('发送消息Failed:', error);
+                        
+                        
                     }
                 }
             }
         }, 1000);
         
     } catch (error) {
-        console.error('打开收藏记录失败:', error);
-        alert('打开收藏记录失败，请重试');
+        console.error('打开Favorites记录Failed:', error);
+        alert('打开Favorites记录Failed，请重试');
     }
 }
 
-// 删除单条收藏记录（取消该记录中所有站点的收藏状态）
+
 async function deleteFavoriteItem(id) {
     try {
         const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
         const historyIndex = pkHistory.findIndex(item => item.id === id);
         
         if (historyIndex === -1) {
-            console.warn('未找到历史记录');
+            console.warn('未找到History');
             return;
         }
         
-        // 取消该记录中所有站点的收藏状态
+        
         const historyItem = pkHistory[historyIndex];
         if (historyItem.sites) {
             historyItem.sites.forEach(site => {
@@ -270,19 +270,19 @@ async function deleteFavoriteItem(id) {
         }
         
         await chrome.storage.local.set({ pkHistory: pkHistory });
-        // 重新加载收藏记录以更新 allFavoriteItems
+        
         await loadFavorites();
     } catch (error) {
-        console.error('删除收藏记录失败:', error);
+        console.error('删除Favorites记录Failed:', error);
     }
 }
 
-// 清空所有收藏记录（取消所有历史记录中站点的收藏状态）
+
 async function clearAllFavorites() {
     try {
         const { pkHistory = [] } = await chrome.storage.local.get('pkHistory');
         
-        // 取消所有历史记录中站点的收藏状态
+        
         pkHistory.forEach(item => {
             if (item.sites) {
                 item.sites.forEach(site => {
@@ -293,11 +293,11 @@ async function clearAllFavorites() {
         
         await chrome.storage.local.set({ pkHistory: pkHistory });
     } catch (error) {
-        console.error('清空收藏记录失败:', error);
+        console.error('清空Favorites记录Failed:', error);
     }
 }
 
-// 格式化日期
+
 function formatDate(timestamp) {
     const date = new Date(timestamp);
     return date.toLocaleString('zh-CN', {

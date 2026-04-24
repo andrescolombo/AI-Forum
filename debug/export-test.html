@@ -48,7 +48,7 @@
     
     <div class="test-section">
         <h2>1. 测试导出按钮是否存在</h2>
-        <button class="test-button" onclick="testExportButton()">检查导出按钮</button>
+        <button class="test-button" onclick="testExportButton()">Check导出按钮</button>
         <div id="buttonTest" class="log"></div>
     </div>
     
@@ -65,8 +65,8 @@
     </div>
     
     <div class="test-section">
-        <h2>4. 测试站点配置</h2>
-        <button class="test-button" onclick="testSiteConfig()">检查站点配置</button>
+        <h2>4. 测试SiteConfig</h2>
+        <button class="test-button" onclick="testSiteConfig()">CheckSiteConfig</button>
         <div id="configTest" class="log"></div>
     </div>
     
@@ -88,7 +88,7 @@
             const logElement = document.getElementById('buttonTest');
             logElement.textContent = '';
             
-            log('buttonTest', '开始检查导出按钮...');
+            log('buttonTest', '开始Check导出按钮...');
             
             const exportButton = document.getElementById('exportResponsesButton');
             if (exportButton) {
@@ -98,7 +98,7 @@
                 log('buttonTest', `按钮是否禁用: ${exportButton.disabled}`);
             } else {
                 log('buttonTest', '❌ 导出按钮不存在');
-                log('buttonTest', '检查页面中是否有 id="exportResponsesButton" 的元素');
+                log('buttonTest', 'Check页面中是否有 id="exportResponsesButton" 的元素');
             }
         }
         
@@ -112,12 +112,12 @@
                 if (typeof initializeExportResponses === 'function') {
                     log('initTest', '✅ initializeExportResponses 函数存在');
                     initializeExportResponses();
-                    log('initTest', '✅ 导出功能初始化完成');
+                    log('initTest', '✅ 导出功能初始化Completed');
                 } else {
                     log('initTest', '❌ initializeExportResponses 函数不存在');
                 }
             } catch (error) {
-                log('initTest', `❌ 初始化失败: ${error.message}`);
+                log('initTest', `❌ 初始化Failed: ${error.message}`);
             }
         }
         
@@ -131,12 +131,12 @@
                 if (typeof showExportModal === 'function') {
                     log('modalTest', '✅ showExportModal 函数存在');
                     showExportModal();
-                    log('modalTest', '✅ 模态框显示完成');
+                    log('modalTest', '✅ 模态框显示Completed');
                 } else {
                     log('modalTest', '❌ showExportModal 函数不存在');
                 }
             } catch (error) {
-                log('modalTest', `❌ 模态框显示失败: ${error.message}`);
+                log('modalTest', `❌ 模态框显示Failed: ${error.message}`);
             }
         }
         
@@ -144,27 +144,27 @@
             const logElement = document.getElementById('configTest');
             logElement.textContent = '';
             
-            log('configTest', '开始检查站点配置...');
+            log('configTest', '开始CheckSiteConfig...');
             
             try {
                 if (typeof window.getDefaultSites === 'function') {
                     log('configTest', '✅ getDefaultSites 函数存在');
                     const sites = await window.getDefaultSites();
-                    log('configTest', `✅ 获取到 ${sites.length} 个站点配置`);
+                    log('configTest', `✅ 获取到 ${sites.length} 个SiteConfig`);
                     
                     sites.forEach((site, index) => {
                         log('configTest', `${index + 1}. ${site.name}: ${site.url}`);
                         if (site.contentExtractor) {
-                            log('configTest', `   - 有内容提取配置: ${site.contentExtractor.selectors?.length || 0} 个选择器`);
+                            log('configTest', `   - 有内容提取Config: ${site.contentExtractor.selectors?.length || 0} 个选择器`);
                         } else {
-                            log('configTest', `   - 无内容提取配置`);
+                            log('configTest', `   - 无内容提取Config`);
                         }
                     });
                 } else {
                     log('configTest', '❌ getDefaultSites 函数不存在');
                 }
             } catch (error) {
-                log('configTest', `❌ 获取站点配置失败: ${error.message}`);
+                log('configTest', `❌ 获取SiteConfigFailed: ${error.message}`);
             }
         }
         
@@ -175,7 +175,7 @@
             log('extractionTest', '开始测试内容提取...');
             
             try {
-                // 创建测试iframe
+                
                 const testIframe = document.createElement('iframe');
                 testIframe.style.display = 'none';
                 testIframe.src = 'data:text/html,<html><body><div class="test-content">这是测试内容</div></body></html>';
@@ -191,17 +191,17 @@
                             log('extractionTest', '❌ extractIframeContent 函数不存在');
                         }
                     } catch (error) {
-                        log('extractionTest', `❌ 内容提取失败: ${error.message}`);
+                        log('extractionTest', `❌ 内容提取Failed: ${error.message}`);
                     } finally {
                         document.body.removeChild(testIframe);
                     }
                 };
             } catch (error) {
-                log('extractionTest', `❌ 测试失败: ${error.message}`);
+                log('extractionTest', `❌ 测试Failed: ${error.message}`);
             }
         }
         
-        // 页面加载完成后自动运行基本测试
+        
         window.addEventListener('load', () => {
             setTimeout(() => {
                 testExportButton();

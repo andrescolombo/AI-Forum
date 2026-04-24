@@ -78,20 +78,20 @@
         <p>2. 找到 "AI Shortcuts" 扩展，复制扩展ID（类似：abcdefghijklmnop...）</p>
         
         <p>3. 在地址栏中输入：</p>
-        <div class="code">chrome-extension://扩展ID/debug/debug-storage.html</div>
+        <div class="code">chrome-extension:
     </div>
 
     <div class="step">
         <h3>🔧 方法二：开发者模式（推荐）</h3>
-        <p>1. 确保扩展已在开发者模式下加载</p>
-        <p>2. 右键点击扩展图标 → "检查弹出内容" 或 "选项"</p>
-        <p>3. 在开发者工具的 Console 中执行：</p>
+        <p>1. 确保扩展已在开发者模式下Load</p>
+        <p>2. 右键Click扩展图标 → "Check弹出内容" 或 "选项"</p>
+        <p>3. 在开发者工具的 Console 中Execute：</p>
         <div class="code">window.open(chrome.runtime.getURL('debug/debug-storage.html'))</div>
     </div>
 
     <div class="step">
         <h3>📱 方法三：从扩展内部跳转</h3>
-        <p>1. 打开 AI Shortcuts 的任意页面（如设置页面）</p>
+        <p>1. 打开 AI Shortcuts 的任意页面（如Settings页面）</p>
         <p>2. 在地址栏中将页面名称改为：</p>
         <div class="code">debug/debug-storage.html</div>
         <p>例如：将 options/options.html 改为 debug/debug-storage.html</p>
@@ -99,7 +99,7 @@
 
     <div class="step">
         <h3>🚀 快速访问链接</h3>
-        <p>如果你的扩展ID是已知的，可以直接点击：</p>
+        <p>如果你的扩展ID是已知的，可以直接Click：</p>
         <button class="button" onclick="openDebugPage()">🔍 打开调试页面</button>
         <button class="button" onclick="openTestPage()">🧪 打开测试页面</button>
     </div>
@@ -123,7 +123,7 @@
             }
         }
 
-        // 显示当前扩展信息
+        
         if (typeof chrome !== 'undefined' && chrome.runtime) {
             const currentUrl = chrome.runtime.getURL('');
             const extensionId = currentUrl.split('://')[1].split('/')[0];

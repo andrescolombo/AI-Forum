@@ -1,10 +1,10 @@
-// AI Shortcuts 扩展专用性能测试脚本
-// 使用方法：在 DevTools Console 中运行此脚本
+
+
 
 console.log('🚀 AI Shortcuts 扩展性能测试开始...');
 console.log('='.repeat(60));
 
-// 性能测试配置
+
 const TEST_CONFIG = {
   iterations: 10,
   memoryThreshold: 50 * 1024 * 1024, // 50MB
@@ -12,7 +12,7 @@ const TEST_CONFIG = {
   domNodeThreshold: 100
 };
 
-// 测试结果存储
+
 const testResults = {
   memory: [],
   responseTime: [],
@@ -20,7 +20,7 @@ const testResults = {
   errors: []
 };
 
-// 1. 内存使用测试
+
 function testMemoryUsage() {
   console.log('📊 测试内存使用情况...');
   
@@ -58,31 +58,31 @@ function testMemoryUsage() {
   });
 }
 
-// 2. 扩展启动性能测试
+
 async function testExtensionStartup() {
   console.log('🚀 测试扩展启动性能...');
   
   const startTime = performance.now();
   
   try {
-    // 测试配置加载
+    
     const configStart = performance.now();
     const config = await chrome.storage.sync.get(['buttonConfig', 'favoriteSites']);
     const configTime = performance.now() - configStart;
     
-    console.log(`  配置加载时间: ${configTime.toFixed(2)}ms`);
+    console.log(`  ConfigLoad时间: ${configTime.toFixed(2)}ms`);
     
     if (configTime > 100) {
-      console.warn('⚠️ 配置加载较慢');
+      console.warn('⚠️ ConfigLoad较慢');
     }
     
-    // 测试站点列表获取
+    
     const sitesStart = performance.now();
     if (typeof window.getDefaultSites === 'function') {
       const sites = await window.getDefaultSites();
       const sitesTime = performance.now() - sitesStart;
-      console.log(`  站点列表获取时间: ${sitesTime.toFixed(2)}ms`);
-      console.log(`  站点数量: ${sites ? sites.length : 0}`);
+      console.log(`  Site列表获取时间: ${sitesTime.toFixed(2)}ms`);
+      console.log(`  Site数量: ${sites ? sites.length : 0}`);
     }
     
     const totalTime = performance.now() - startTime;
@@ -102,12 +102,12 @@ async function testExtensionStartup() {
     });
     
   } catch (error) {
-    console.error('❌ 启动测试失败:', error);
-    testResults.errors.push(`启动测试失败: ${error.message}`);
+    console.error('❌ 启动测试Failed:', error);
+    testResults.errors.push(`启动测试Failed: ${error.message}`);
   }
 }
 
-// 3. 浮动按钮性能测试
+
 function testFloatButtonPerformance() {
   console.log('🎯 测试浮动按钮性能...');
   
@@ -117,7 +117,7 @@ function testFloatButtonPerformance() {
     return;
   }
   
-  // 测试按钮渲染时间
+  
   const renderStart = performance.now();
   const buttonRect = button.getBoundingClientRect();
   const renderTime = performance.now() - renderStart;
@@ -126,7 +126,7 @@ function testFloatButtonPerformance() {
   console.log(`  按钮位置: (${buttonRect.left}, ${buttonRect.top})`);
   console.log(`  按钮大小: ${buttonRect.width}x${buttonRect.height}`);
   
-  // 测试事件监听器数量
+  
   const eventListeners = countEventListeners(button);
   console.log(`  事件监听器数量: ${eventListeners}`);
   
@@ -134,7 +134,7 @@ function testFloatButtonPerformance() {
     console.warn('⚠️ 事件监听器过多');
   }
   
-  // 测试 DOM 节点数量
+  
   const domNodes = button.querySelectorAll('*').length;
   console.log(`  DOM 节点数量: ${domNodes}`);
   
@@ -149,7 +149,7 @@ function testFloatButtonPerformance() {
   });
 }
 
-// 4. 消息传递性能测试
+
 async function testMessagePerformance() {
   console.log('📨 测试消息传递性能...');
   
@@ -188,13 +188,13 @@ async function testMessagePerformance() {
       });
       
     } catch (error) {
-      console.error(`❌ ${test.action} 测试失败:`, error);
-      testResults.errors.push(`${test.action} 测试失败`);
+      console.error(`❌ ${test.action} 测试Failed:`, error);
+      testResults.errors.push(`${test.action} 测试Failed`);
     }
   }
 }
 
-// 5. 存储操作性能测试
+
 async function testStoragePerformance() {
   console.log('💾 测试存储操作性能...');
   
@@ -207,7 +207,7 @@ async function testStoragePerformance() {
     const startTime = performance.now();
     
     try {
-      // 写入测试
+      
       await new Promise((resolve, reject) => {
         chrome.storage[test.type].set({ [test.key]: test.value }, () => {
           if (chrome.runtime.lastError) {
@@ -218,7 +218,7 @@ async function testStoragePerformance() {
         });
       });
       
-      // 读取测试
+      
       await new Promise((resolve, reject) => {
         chrome.storage[test.type].get(test.key, (result) => {
           if (chrome.runtime.lastError) {
@@ -244,13 +244,13 @@ async function testStoragePerformance() {
       });
       
     } catch (error) {
-      console.error(`❌ ${test.type} 存储测试失败:`, error);
-      testResults.errors.push(`${test.type} 存储测试失败`);
+      console.error(`❌ ${test.type} 存储测试Failed:`, error);
+      testResults.errors.push(`${test.type} 存储测试Failed`);
     }
   }
 }
 
-// 6. 网络请求性能测试
+
 function testNetworkPerformance() {
   console.log('🌐 测试网络请求性能...');
   
@@ -276,7 +276,7 @@ function testNetworkPerformance() {
   });
   
   const avgLoadTime = extensionResources.length > 0 ? totalLoadTime / extensionResources.length : 0;
-  console.log(`  平均加载时间: ${avgLoadTime.toFixed(2)}ms`);
+  console.log(`  平均Load时间: ${avgLoadTime.toFixed(2)}ms`);
   console.log(`  慢资源数量: ${slowResources}`);
   
   if (slowResources > 2) {
@@ -285,7 +285,7 @@ function testNetworkPerformance() {
   }
 }
 
-// 7. 长时间任务检测
+
 function testLongTasks() {
   console.log('⏱️ 检测长时间运行的任务...');
   
@@ -308,14 +308,14 @@ function testLongTasks() {
   
   observer.observe({ entryTypes: ['longtask'] });
   
-  // 5秒后停止观察
+  
   setTimeout(() => {
     observer.disconnect();
-    console.log('✅ 长时间任务检测完成');
+    console.log('✅ 长时间任务检测Completed');
   }, 5000);
 }
 
-// 8. 内存泄漏检测
+
 function testMemoryLeak() {
   console.log('🔍 检测内存泄漏...');
   
@@ -326,9 +326,9 @@ function testMemoryLeak() {
   
   const initialMemory = performance.memory.usedJSHeapSize;
   
-  // 执行一些操作来测试内存泄漏
+  
   for (let i = 0; i < 100; i++) {
-    // 模拟用户操作
+    
     const div = document.createElement('div');
     div.className = 'test-element';
     div.textContent = `Test ${i}`;
@@ -336,7 +336,7 @@ function testMemoryLeak() {
     document.body.removeChild(div);
   }
   
-  // 强制垃圾回收（如果可用）
+  
   if (window.gc) {
     window.gc();
   }
@@ -354,7 +354,7 @@ function testMemoryLeak() {
   }
 }
 
-// 9. 事件监听器检测
+
 function countEventListeners(element) {
   let count = 0;
   const events = ['click', 'mousedown', 'mouseup', 'keydown', 'keyup', 'scroll', 'resize'];
@@ -367,30 +367,30 @@ function countEventListeners(element) {
   return count;
 }
 
-// 10. 生成性能报告
+
 function generatePerformanceReport() {
   console.log('\n📋 性能测试报告');
   console.log('='.repeat(60));
   
-  // 内存使用统计
+  
   if (testResults.memory.length > 0) {
     const avgMemory = testResults.memory.reduce((sum, m) => sum + m.usagePercent, 0) / testResults.memory.length;
     console.log(`📊 平均内存使用率: ${avgMemory.toFixed(2)}%`);
   }
   
-  // 响应时间统计
+  
   if (testResults.responseTime.length > 0) {
     const avgResponseTime = testResults.responseTime.reduce((sum, r) => sum + r.time, 0) / testResults.responseTime.length;
     console.log(`⏱️ 平均响应时间: ${avgResponseTime.toFixed(2)}ms`);
   }
   
-  // DOM 节点统计
+  
   if (testResults.domNodes.length > 0) {
     const avgDomNodes = testResults.domNodes.reduce((sum, d) => sum + d.domNodes, 0) / testResults.domNodes.length;
     console.log(`🌳 平均 DOM 节点数: ${avgDomNodes.toFixed(0)}`);
   }
   
-  // 错误统计
+  
   if (testResults.errors.length > 0) {
     console.log(`❌ 发现 ${testResults.errors.length} 个问题:`);
     testResults.errors.forEach((error, index) => {
@@ -400,7 +400,7 @@ function generatePerformanceReport() {
     console.log('✅ 未发现性能问题');
   }
   
-  // 性能评分
+  
   let score = 100;
   if (testResults.errors.length > 0) {
     score -= testResults.errors.length * 10;
@@ -419,7 +419,7 @@ function generatePerformanceReport() {
   }
 }
 
-// 11. 运行所有测试
+
 async function runAllTests() {
   console.log('🧪 开始运行所有性能测试...\n');
   
@@ -433,7 +433,7 @@ async function runAllTests() {
     testLongTasks();
     testMemoryLeak();
     
-    // 等待一段时间让长时间任务检测完成
+    
     setTimeout(() => {
       generatePerformanceReport();
     }, 6000);
@@ -443,7 +443,7 @@ async function runAllTests() {
   }
 }
 
-// 12. 快速测试（仅关键指标）
+
 function quickTest() {
   console.log('⚡ 快速性能测试...');
   
@@ -456,7 +456,7 @@ function quickTest() {
   }, 1000);
 }
 
-// 导出测试函数
+
 window.extensionPerformanceTest = {
   runAll: runAllTests,
   quick: quickTest,
@@ -471,7 +471,7 @@ window.extensionPerformanceTest = {
   report: generatePerformanceReport
 };
 
-// 自动运行测试
+
 console.log('🎯 可用的测试命令:');
 console.log('  extensionPerformanceTest.runAll() - 运行所有测试');
 console.log('  extensionPerformanceTest.quick() - 快速测试');
@@ -485,5 +485,5 @@ console.log('  extensionPerformanceTest.longTasks() - 长时间任务测试');
 console.log('  extensionPerformanceTest.memoryLeak() - 内存泄漏测试');
 console.log('  extensionPerformanceTest.report() - 生成报告');
 
-// 自动运行快速测试
+
 quickTest();

@@ -1,7 +1,4 @@
-/**
- * 优化效果测试脚本
- * 测试内容提取、站点检测和导出功能的性能提升
- */
+
 
 class OptimizationTester {
   constructor() {
@@ -12,16 +9,14 @@ class OptimizationTester {
     };
   }
 
-  /**
-   * 测试内容提取优化
-   */
+  
   async testContentExtraction() {
     console.log('🧪 开始测试内容提取优化...');
     
     const testCases = [
       {
         name: '高质量内容',
-        content: '根据您的问题，我建议采用以下方案：\n\n1. 首先分析需求\n2. 然后制定计划\n3. 最后执行实施\n\n这样可以确保项目的成功。',
+        content: '根据您的问题，我建议采用以下方案：\n\n1. 首先分析需求\n2. 然后制定计划\n3. 最后Execute实施\n\n这样可以确保项目的Successful。',
         expected: true
       },
       {
@@ -46,7 +41,7 @@ class OptimizationTester {
 
     for (const testCase of testCases) {
       try {
-        // 模拟内容质量检测
+        
         const result = this.isHighQualityContent(testCase.content);
         const passed = result === testCase.expected;
         
@@ -54,7 +49,7 @@ class OptimizationTester {
           passedTests++;
           console.log(`✅ ${testCase.name}: 通过`);
         } else {
-          console.log(`❌ ${testCase.name}: 失败 (期望: ${testCase.expected}, 实际: ${result})`);
+          console.log(`❌ ${testCase.name}: Failed (期望: ${testCase.expected}, 实际: ${result})`);
         }
       } catch (error) {
         console.error(`❌ ${testCase.name}: 错误 -`, error);
@@ -71,14 +66,12 @@ class OptimizationTester {
       executionTime: totalTime.toFixed(2) + 'ms'
     };
 
-    console.log(`📊 内容提取测试完成: ${passedTests}/${testCases.length} 通过, 耗时 ${totalTime.toFixed(2)}ms`);
+    console.log(`📊 内容提取测试Completed: ${passedTests}/${testCases.length} 通过, 耗时 ${totalTime.toFixed(2)}ms`);
   }
 
-  /**
-   * 测试站点检测优化
-   */
+  
   async testSiteDetection() {
-    console.log('🧪 开始测试站点检测优化...');
+    console.log('🧪 开始测试Site检测优化...');
     
     const testDomains = [
       'chat.openai.com',
@@ -93,16 +86,16 @@ class OptimizationTester {
 
     for (const domain of testDomains) {
       try {
-        // 模拟站点检测
+        
         const result = await this.simulateSiteDetection(domain);
         if (result) {
           successfulDetections++;
-          console.log(`✅ ${domain}: 检测成功`);
+          console.log(`✅ ${domain}: 检测Successful`);
         } else {
           console.log(`⚠️ ${domain}: 未检测到`);
         }
       } catch (error) {
-        console.error(`❌ ${domain}: 检测失败 -`, error);
+        console.error(`❌ ${domain}: 检测Failed -`, error);
       }
     }
 
@@ -116,12 +109,10 @@ class OptimizationTester {
       executionTime: totalTime.toFixed(2) + 'ms'
     };
 
-    console.log(`📊 站点检测测试完成: ${successfulDetections}/${testDomains.length} 成功, 耗时 ${totalTime.toFixed(2)}ms`);
+    console.log(`📊 Site检测测试Completed: ${successfulDetections}/${testDomains.length} Successful, 耗时 ${totalTime.toFixed(2)}ms`);
   }
 
-  /**
-   * 测试导出性能优化
-   */
+  
   async testExportPerformance() {
     console.log('🧪 开始测试导出性能优化...');
     
@@ -146,9 +137,9 @@ class OptimizationTester {
     for (const format of formats) {
       try {
         const exportContent = this.generateExportContent(mockResponses, format);
-        console.log(`✅ ${format} 格式导出成功，长度: ${exportContent.length}`);
+        console.log(`✅ ${format} 格式导出Successful，长度: ${exportContent.length}`);
       } catch (error) {
-        console.error(`❌ ${format} 格式导出失败:`, error);
+        console.error(`❌ ${format} 格式导出Failed:`, error);
       }
     }
 
@@ -161,12 +152,10 @@ class OptimizationTester {
       averageTimePerFormat: (totalTime / formats.length).toFixed(2) + 'ms'
     };
 
-    console.log(`📊 导出性能测试完成，耗时 ${totalTime.toFixed(2)}ms`);
+    console.log(`📊 导出性能测试Completed，耗时 ${totalTime.toFixed(2)}ms`);
   }
 
-  /**
-   * 模拟内容质量检测
-   */
+  
   isHighQualityContent(content) {
     if (!content || content.length < 10) return false;
     
@@ -190,22 +179,18 @@ class OptimizationTester {
     return hasAIIndicator && (hasStructure || hasCodeOrList) && hasCompleteSentences;
   }
 
-  /**
-   * 模拟站点检测
-   */
+  
   async simulateSiteDetection(domain) {
-    // 模拟异步检测
+    
     return new Promise((resolve) => {
       setTimeout(() => {
         const knownSites = ['chat.openai.com', 'claude.ai', 'gemini.google.com', 'x.ai'];
         resolve(knownSites.includes(domain));
-      }, Math.random() * 10); // 模拟网络延迟
+      }, Math.random() * 10); 
     });
   }
 
-  /**
-   * 生成导出内容
-   */
+  
   generateExportContent(responses, format) {
     const timestamp = new Date().toISOString();
     
@@ -230,9 +215,7 @@ class OptimizationTester {
     }
   }
 
-  /**
-   * 运行所有测试
-   */
+  
   async runAllTests() {
     console.log('🚀 开始运行优化效果测试...\n');
     
@@ -248,31 +231,29 @@ class OptimizationTester {
     this.generateReport();
   }
 
-  /**
-   * 生成测试报告
-   */
+  
   generateReport() {
     console.log('📋 优化效果测试报告');
     console.log('='.repeat(50));
     
     console.log('\n🔍 内容提取优化:');
-    console.log(`  成功率: ${this.testResults.contentExtraction.successRate}`);
-    console.log(`  执行时间: ${this.testResults.contentExtraction.executionTime}`);
+    console.log(`  Successful率: ${this.testResults.contentExtraction.successRate}`);
+    console.log(`  Execute时间: ${this.testResults.contentExtraction.executionTime}`);
     
-    console.log('\n🎯 站点检测优化:');
-    console.log(`  成功率: ${this.testResults.siteDetection.successRate}`);
-    console.log(`  执行时间: ${this.testResults.siteDetection.executionTime}`);
+    console.log('\n🎯 Site检测优化:');
+    console.log(`  Successful率: ${this.testResults.siteDetection.successRate}`);
+    console.log(`  Execute时间: ${this.testResults.siteDetection.executionTime}`);
     
     console.log('\n📤 导出性能优化:');
     console.log(`  支持格式: ${this.testResults.exportPerformance.formats}`);
-    console.log(`  总执行时间: ${this.testResults.exportPerformance.executionTime}`);
+    console.log(`  总Execute时间: ${this.testResults.exportPerformance.executionTime}`);
     console.log(`  平均每格式: ${this.testResults.exportPerformance.averageTimePerFormat}`);
     
-    console.log('\n✅ 所有测试完成！');
+    console.log('\n✅ 所有测试Completed！');
   }
 }
 
-// 运行测试
+
 if (typeof window !== 'undefined') {
   const tester = new OptimizationTester();
   tester.runAllTests().catch(console.error);

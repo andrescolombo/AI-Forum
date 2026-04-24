@@ -312,7 +312,7 @@
 <body>
     <div class="header">
         <h1>🔍 AI Shortcuts 存储状态测试</h1>
-        <p>实时查看四种配置来源的状态和内容</p>
+        <p>实时查看四种Config来源的状态和内容</p>
     </div>
 
     <div class="controls">
@@ -322,17 +322,17 @@
     </div>
 
     <div class="container">
-        <!-- 历史记录区域（顶部） -->
+        <!-- History区域（顶部） -->
         <div class="row">
             <div class="column column-6" style="grid-column: 1 / -1;">
                 <div class="column-header">
-                    📚 PK 历史记录
+                    📚 PK History
                     <button class="refresh-btn" data-action="loadHistory">刷新</button>
                 </div>
                 <div class="column-content">
                     <div id="history-status" class="status loading">
                         <div class="loading-spinner"></div>
-                        正在加载...
+                        正在Load...
                     </div>
                     <div id="history-stats" class="stats"></div>
                     <div id="history-content" class="json-content"></div>
@@ -340,17 +340,17 @@
             </div>
         </div>
 
-        <!-- 收藏记录区域 -->
+        <!-- Favorites记录区域 -->
         <div class="row">
             <div class="column column-7" style="grid-column: 1 / -1;">
                 <div class="column-header">
-                    ⭐ 收藏记录
+                    ⭐ Favorites记录
                     <button class="refresh-btn" data-action="loadFavorites">刷新</button>
                 </div>
                 <div class="column-content">
                     <div id="favorites-status" class="status loading">
                         <div class="loading-spinner"></div>
-                        正在加载...
+                        正在Load...
                     </div>
                     <div id="favorites-stats" class="stats"></div>
                     <div id="favorites-content" class="json-content"></div>
@@ -358,7 +358,7 @@
             </div>
         </div>
 
-        <!-- 第一行：Chrome Storage Local 和 远程配置更新 -->
+        <!-- 第一行：Chrome Storage Local 和 远程ConfigUpdate -->
         <div class="row">
             <!-- Chrome Storage Local -->
             <div class="column column-1">
@@ -369,7 +369,7 @@
                 <div class="column-content">
                     <div id="local-status" class="status loading">
                         <div class="loading-spinner"></div>
-                        正在加载...
+                        正在Load...
                     </div>
                     <div id="local-stats" class="stats"></div>
                     <div id="local-version" class="version-info" style="display: none;"></div>
@@ -380,13 +380,13 @@
             <!-- Remote Config -->
             <div class="column column-4">
                 <div class="column-header">
-                    🌐 远程配置更新
+                    🌐 远程ConfigUpdate
                     <button class="refresh-btn" data-action="loadRemoteConfig">刷新</button>
                 </div>
                 <div class="column-content">
                     <div id="remote-status" class="status loading">
                         <div class="loading-spinner"></div>
-                        正在加载...
+                        正在Load...
                     </div>
                     <div id="remote-stats" class="stats"></div>
                     <div id="remote-version" class="version-info" style="display: none;"></div>
@@ -406,7 +406,7 @@
                 <div class="column-content">
                     <div id="sync-status" class="status loading">
                         <div class="loading-spinner"></div>
-                        正在加载...
+                        正在Load...
                     </div>
                     <div id="sync-stats" class="stats"></div>
                     <div id="sync-content" class="json-content"></div>
@@ -422,7 +422,7 @@
                 <div class="column-content">
                     <div id="config-status" class="status loading">
                         <div class="loading-spinner"></div>
-                        正在加载...
+                        正在Load...
                     </div>
                     <div id="config-stats" class="stats"></div>
                     <div id="config-version" class="version-info" style="display: none;"></div>
@@ -431,18 +431,18 @@
             </div>
         </div>
 
-        <!-- 第三行：合并后的站点 -->
+        <!-- 第三行：合并后的Site -->
         <div class="row">
-            <!-- 合并后的站点 -->
+            <!-- 合并后的Site -->
             <div class="column column-5" style="grid-column: 1 / -1;">
                 <div class="column-header">
-                    🔄 合并后的站点 (getDefaultSites)
+                    🔄 合并后的Site (getDefaultSites)
                     <button class="refresh-btn" data-action="loadMergedSites">刷新</button>
                 </div>
                 <div class="column-content">
                     <div id="merged-status" class="status loading">
                         <div class="loading-spinner"></div>
-                        正在加载...
+                        正在Load...
                     </div>
                     <div id="merged-stats" class="stats"></div>
                     <div id="merged-content" class="json-content"></div>

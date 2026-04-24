@@ -1,6 +1,6 @@
-// ==================== 导出回答功能实现 ====================
 
-// 安全的国际化函数
+
+
 function getI18nMessage(key, fallback) {
   try {
     if (typeof chrome !== 'undefined' && chrome.i18n && chrome.i18n.getMessage) {
@@ -8,13 +8,13 @@ function getI18nMessage(key, fallback) {
       return message || fallback;
     }
   } catch (error) {
-    console.warn('国际化函数调用失败:', error);
+    console.warn('国际化函数调用Failed:', error);
   }
   return fallback;
 }
 
  
-// Toast 提示函数
+
 function showToast(message, duration = 2000) {
   const toast = document.createElement('div');
   toast.className = 'toast';
@@ -40,12 +40,12 @@ function showToast(message, duration = 2000) {
   
   document.body.appendChild(toast);
   
-  // 添加显示动画
+  
   setTimeout(() => {
     toast.style.opacity = '1';
   }, 10);
   
-  // 定时移除
+  
   setTimeout(() => {
     toast.style.opacity = '0';
     setTimeout(() => {
@@ -56,18 +56,18 @@ function showToast(message, duration = 2000) {
   }, duration);
 }
 
-// 显示导出模态框
+
 function showExportModal() {
   console.log('🎯 开始显示导出模态框');
   
-  // 测试 showToast 函数是否可用
+  
   try {
-    showToast('导出功能正在加载...', 1000);
+    showToast('导出功能正在Load...', 1000);
   } catch (error) {
-    console.error('showToast 函数测试失败:', error);
+    console.error('showToast 函数测试Failed:', error);
   }
   
-  // 创建模态框
+  
   const modal = document.createElement('div');
   modal.className = 'export-modal';
   modal.innerHTML = `
@@ -94,9 +94,9 @@ function showExportModal() {
         </div>
         
         <div class="export-option-group">
-          <label class="export-option-label">${getI18nMessage('selectSites', '选择站点')}</label>
+          <label class="export-option-label">${getI18nMessage('selectSites', '选择Site')}</label>
           <div class="export-site-selection" id="exportSiteSelection">
-            <!-- 站点选项将动态生成 -->
+            <!-- Site选项将动态生成 -->
           </div>
         </div>
       </div>
@@ -104,7 +104,7 @@ function showExportModal() {
       <div class="export-preview">
         <div class="export-preview-title">📋 ${getI18nMessage('preview', '预览')}</div>
         <div class="export-preview-content" id="exportPreviewContent">
-          选择站点和格式后将显示预览...
+          选择Site和格式后将显示预览...
         </div>
       </div>
       
@@ -119,11 +119,11 @@ function showExportModal() {
   
   console.log('🎯 导出模态框已添加到页面');
   
-  // 初始化模态框功能
+  
   initializeExportModal(modal);
 }
 
-// 初始化导出模态框功能
+
 function initializeExportModal(modal) {
   const closeBtn = modal.querySelector('#exportCloseBtn');
   const cancelBtn = modal.querySelector('#exportCancelBtn');
@@ -135,7 +135,7 @@ function initializeExportModal(modal) {
   let selectedFormat = 'markdown';
   let selectedSites = new Set();
   
-  // 关闭模态框
+  
   const closeModal = () => {
     modal.style.animation = 'fadeIn 0.3s ease-out reverse';
     setTimeout(() => {
@@ -145,18 +145,18 @@ function initializeExportModal(modal) {
     }, 300);
   };
   
-  // 事件监听器
+  
   closeBtn.addEventListener('click', closeModal);
   cancelBtn.addEventListener('click', closeModal);
   
-  // 点击背景关闭
+  
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
       closeModal();
     }
   });
   
-  // 格式选择
+  
   formatButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       formatButtons.forEach(b => b.classList.remove('active'));
@@ -166,17 +166,17 @@ function initializeExportModal(modal) {
     });
   });
   
-  // 加载站点列表
+  
   loadExportSites(siteSelection, modal);
   
-  // 更新预览（优化版）
+  
   function updatePreview() {
     if (!modal.selectedSites || modal.selectedSites.size === 0) {
-      previewContent.textContent = '请选择要导出的站点...';
+      previewContent.textContent = '请选择要导出的Site...';
       return;
     }
     
-    // 显示加载状态
+    
     previewContent.innerHTML = `
       <div class="loading-indicator">
         <div class="loading-spinner"></div>
@@ -185,7 +185,7 @@ function initializeExportModal(modal) {
       </div>
     `;
     
-    // 收集选中站点的回答内容（使用缓存）
+    
     collectResponses(modal.selectedSites, true).then(responses => {
       const preview = generatePreview(responses, selectedFormat);
       previewContent.textContent = preview;
@@ -193,19 +193,19 @@ function initializeExportModal(modal) {
       previewContent.innerHTML = `
         <div class="error-message">
           <div class="error-icon">❌</div>
-          <div class="error-text">预览生成失败: ${error.message}</div>
+          <div class="error-text">预览生成Failed: ${error.message}</div>
           <div class="error-hint">请尝试刷新后重试</div>
         </div>
       `;
     });
   }
   
-  // 确认导出（优化版）
+  
   confirmBtn.addEventListener('click', async () => {
-    console.log('导出按钮被点击，当前选中的站点:', Array.from(modal.selectedSites || new Set()));
+    console.log('导出按钮被Click，当前选中的Site:', Array.from(modal.selectedSites || new Set()));
     
     if (!modal.selectedSites || modal.selectedSites.size === 0) {
-      showToast(getI18nMessage('selectSitesToExport', '请选择要导出的站点'));
+      showToast(getI18nMessage('selectSitesToExport', '请选择要导出的Site'));
       return;
     }
     
@@ -218,13 +218,13 @@ function initializeExportModal(modal) {
         </div>
       `;
       
-      // 收集回答内容（导出时不使用缓存，确保最新内容）
+      
       const responses = await collectResponses(modal.selectedSites, false);
       
-      // 生成导出内容
+      
       const exportContent = generateExportContent(responses, selectedFormat);
       
-      // 执行导出
+      
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const fileExt =
         selectedFormat === 'markdown' ? 'md' :
@@ -237,12 +237,12 @@ function initializeExportModal(modal) {
       
       downloadFile(exportContent, filename, mimeType);
       
-      showToast(getI18nMessage('exportSuccess', '导出成功！'));
+      showToast(getI18nMessage('exportSuccess', '导出Successful！'));
       closeModal();
       
     } catch (error) {
-      console.error('导出失败:', error);
-      showToast(getI18nMessage('exportFailed', '导出失败') + ': ' + error.message);
+      console.error('导出Failed:', error);
+      showToast(getI18nMessage('exportFailed', '导出Failed') + ': ' + error.message);
     } finally {
       confirmBtn.disabled = false;
       confirmBtn.innerHTML = getI18nMessage('export', '导出');
@@ -250,7 +250,7 @@ function initializeExportModal(modal) {
   });
 }
 
-// 加载导出站点列表
+
 function loadExportSites(container, modal) {
   const iframes = document.querySelectorAll('.ai-iframe');
   const selectedSites = new Set();
@@ -266,13 +266,13 @@ function loadExportSites(container, modal) {
       <label class="export-site-name" for="site-${siteName}">${siteName}</label>
     `;
     
-    // 添加到选中列表
+    
     selectedSites.add(siteName);
     
-    // 添加选择事件
+    
     const checkbox = siteItem.querySelector('.export-site-checkbox');
     checkbox.addEventListener('change', (e) => {
-      console.log(`站点 ${siteName} 选择状态改变:`, e.target.checked);
+      console.log(`Site ${siteName} 选择状态改变:`, e.target.checked);
       
       if (e.target.checked) {
         selectedSites.add(siteName);
@@ -280,12 +280,12 @@ function loadExportSites(container, modal) {
         selectedSites.delete(siteName);
       }
       
-      console.log('当前选中的站点:', Array.from(selectedSites));
+      console.log('当前选中的Site:', Array.from(selectedSites));
       
-      // 更新预览
+      
       const previewContent = modal.querySelector('#exportPreviewContent');
       if (selectedSites.size === 0) {
-        previewContent.textContent = '请选择要导出的站点...';
+        previewContent.textContent = '请选择要导出的Site...';
       } else {
         collectResponses(selectedSites).then(responses => {
           const formatButtons = modal.querySelectorAll('.export-format-btn');
@@ -293,7 +293,7 @@ function loadExportSites(container, modal) {
           const preview = generatePreview(responses, activeFormat);
           previewContent.textContent = preview;
         }).catch(error => {
-          previewContent.textContent = `预览生成失败: ${error.message}`;
+          previewContent.textContent = `预览生成Failed: ${error.message}`;
         });
       }
     });
@@ -301,12 +301,12 @@ function loadExportSites(container, modal) {
     container.appendChild(siteItem);
   });
   
-  // 将 selectedSites 存储到模态框对象上
+  
   modal.selectedSites = selectedSites;
   
-  console.log('初始选中的站点:', Array.from(selectedSites));
+  console.log('初始选中的Site:', Array.from(selectedSites));
   
-  // 初始化预览
+  
   setTimeout(() => {
     const previewContent = modal.querySelector('#exportPreviewContent');
     if (selectedSites.size > 0) {
@@ -316,31 +316,31 @@ function loadExportSites(container, modal) {
         const preview = generatePreview(responses, activeFormat);
         previewContent.textContent = preview;
       }).catch(error => {
-        previewContent.textContent = `预览生成失败: ${error.message}`;
+        previewContent.textContent = `预览生成Failed: ${error.message}`;
       });
     }
   }, 100);
 }
 
-// 缓存功能已移除，确保实时性
 
-// 从页面中提取URL（基于配置文件）
+
+
 async function extractAlternateUrl(siteName) {
   try {
     console.log(`🔍 开始为 ${siteName} 提取URL...`);
     
-    // 强制清除配置缓存（如果存在）
+    
     if (window.siteDetector && window.siteDetector.clearCache) {
-      console.log('🧹 清除配置缓存...');
+      console.log('🧹 清除Config缓存...');
       window.siteDetector.clearCache();
     }
     
-    // 获取站点配置
+    
     const siteConfig = await getSiteContentExtractorConfig(siteName);
-    console.log(`📋 ${siteName} 配置:`, siteConfig);
+    console.log(`📋 ${siteName} Config:`, siteConfig);
     
     if (!siteConfig || !siteConfig.urlExtractor) {
-      console.log(`⚠️ ${siteName} 未配置URL提取器`);
+      console.log(`⚠️ ${siteName} 未ConfigURL提取器`);
       console.log(`🔍 调试信息 - siteConfig:`, siteConfig);
       console.log(`🔍 调试信息 - urlExtractor:`, siteConfig?.urlExtractor);
       return null;
@@ -349,16 +349,16 @@ async function extractAlternateUrl(siteName) {
     const { alternateLinkSelector, urlPattern, removeParams } = siteConfig.urlExtractor;
     console.log(`🎯 使用选择器: ${alternateLinkSelector}, 模式: ${urlPattern}, 删除参数: ${removeParams}`);
     
-    // 查找所有alternate link标签
+    
     const alternateLinks = document.querySelectorAll(alternateLinkSelector);
     console.log(`🔍 找到 ${alternateLinks.length} 个alternate链接`);
     
     for (const link of alternateLinks) {
       const href = link.getAttribute('href');
-      console.log(`🔗 检查链接: ${href}`);
+      console.log(`🔗 Check链接: ${href}`);
       
       if (href && href.includes(urlPattern)) {
-        // 解析URL并去掉指定参数
+        
         const url = new URL(href);
         console.log(`🧹 原始URL参数:`, Array.from(url.searchParams.keys()));
         
@@ -380,18 +380,18 @@ async function extractAlternateUrl(siteName) {
   }
 }
 
-// 收集iframe中的回答内容（实时提取版）
+
 async function collectResponses(selectedSites) {
-  console.log('🎯 开始收集回答内容，选择的站点:', selectedSites);
+  console.log('🎯 开始收集回答内容，选择的Site:', selectedSites);
   
   const responses = [];
   
-  // 性能监控
+  
   const startTime = performance.now();
   let successCount = 0;
   let errorCount = 0;
   
-  // 并行处理所有站点，提升性能
+  
   const extractPromises = Array.from(selectedSites).map(async (siteName) => {
     try {
       const iframe = document.querySelector(`[data-site="${siteName}"]`);
@@ -403,37 +403,37 @@ async function collectResponses(selectedSites) {
       const iframeUrl = iframe.src || 'unknown';
       console.log(`🔍 [DEBUG] ${siteName} iframeUrl:`, iframeUrl);
       
-      // 尝试从alternate标签获取清洁的URL（基于配置）
+      
       let finalUrl = iframeUrl;
       console.log(`🔍 准备调用 extractAlternateUrl(${siteName})...`);
       const alternateUrl = await extractAlternateUrl(siteName);
       console.log(`🔍 extractAlternateUrl 返回:`, alternateUrl);
       if (alternateUrl) {
         finalUrl = alternateUrl;
-        console.log(`🔄 ${siteName} URL更新: ${iframeUrl} → ${finalUrl}`);
+        console.log(`🔄 ${siteName} URLUpdate: ${iframeUrl} → ${finalUrl}`);
       } else {
         console.log(`📝 ${siteName} 使用原始URL: ${finalUrl}`);
       }
       
-      // 直接进行实时内容提取，不使用缓存
+      
       
       console.log(`🎯 开始提取 ${siteName} 的内容...`);
       
-      // 尝试从iframe中提取内容
+      
       const extractResult = await extractIframeContent(iframe, siteName);
       console.log(`🔍 [DEBUG] extractResult 类型:`, typeof extractResult, extractResult);
       
-      // 处理新的返回格式
+      
       let content, extractionMethod, extractedUrl;
       
-      // 统一处理为字符串格式
+      
       if (typeof extractResult === 'string') {
         content = extractResult;
-        extractionMethod = '配置方法';
+        extractionMethod = 'Config方法';
         extractedUrl = iframeUrl;
       } else if (extractResult && typeof extractResult === 'object') {
         content = extractResult.content || '';
-        extractionMethod = extractResult.extractionMethod || '配置方法';
+        extractionMethod = extractResult.extractionMethod || 'Config方法';
         extractedUrl = extractResult.url || iframeUrl;
       } else {
         content = '';
@@ -441,7 +441,7 @@ async function collectResponses(selectedSites) {
         extractedUrl = iframeUrl;
       }
       
-      // 使用从iframe中提取的URL
+      
       if (extractedUrl && extractedUrl !== iframeUrl) {
         finalUrl = extractedUrl;
         console.log(`🔄 ${siteName} 使用iframe提取的URL: ${finalUrl}`);
@@ -459,27 +459,27 @@ async function collectResponses(selectedSites) {
         
         console.log(`📋 ${siteName} 响应数据URL: ${responseData.url}`);
         
-        console.log(`✅ 成功提取 ${siteName} 内容，长度: ${content.length}, 方法: ${extractionMethod}`);
+        console.log(`✅ Successful提取 ${siteName} 内容，长度: ${content.length}, 方法: ${extractionMethod}`);
         return responseData;
       } else {
         console.log(`⚠️ ${siteName} 未提取到内容`);
         return null;
       }
     } catch (error) {
-      console.error(`❌ 提取 ${siteName} 内容失败:`, error);
+      console.error(`❌ 提取 ${siteName} 内容Failed:`, error);
       return {
         siteName: siteName,
-        content: `内容提取失败: ${error.message}`,
+        content: `内容提取Failed: ${error.message}`,
         timestamp: new Date().toISOString(),
         error: true
       };
     }
   });
   
-  // 等待所有提取任务完成
+  
   const results = await Promise.all(extractPromises);
   
-  // 过滤和统计结果
+  
   results.forEach(result => {
     if (result) {
       responses.push(result);
@@ -494,39 +494,39 @@ async function collectResponses(selectedSites) {
   const endTime = performance.now();
   const totalTime = endTime - startTime;
   
-  console.log(`🎯 收集完成，共获得 ${responses.length} 个回答`);
-  console.log(`📊 性能统计: 成功 ${successCount}, 失败 ${errorCount}, 耗时 ${totalTime.toFixed(2)}ms`);
+  console.log(`🎯 收集Completed，共获得 ${responses.length} 个回答`);
+  console.log(`📊 性能统计: Successful ${successCount}, Failed ${errorCount}, 耗时 ${totalTime.toFixed(2)}ms`);
   
   return responses;
 }
 
-// 从iframe中提取内容
+
 async function extractIframeContent(iframe, siteName) {
-  // 优先使用消息通信方式（适用于跨域iframe）
+  
   try {
     console.log(`尝试通过消息通信获取 ${siteName} 内容...`);
     const result = await requestIframeContent(iframe, siteName);
     
-    // 处理新的返回格式（对象包含content和url）
+    
     if (result && typeof result === 'object' && result.content) {
-      console.log(`✅ 成功通过消息通信获取 ${siteName} 内容`);
+      console.log(`✅ Successful通过消息通信获取 ${siteName} 内容`);
       return result;
     } else if (result && typeof result === 'string' && result.trim()) {
-      console.log(`✅ 成功通过消息通信获取 ${siteName} 内容（字符串格式）`);
+      console.log(`✅ Successful通过消息通信获取 ${siteName} 内容（字符串格式）`);
       return result;
     }
   } catch (error) {
-    console.log(`消息通信获取 ${siteName} 内容失败:`, error.message);
+    console.log(`消息通信获取 ${siteName} 内容Failed:`, error.message);
   }
   
-  // 备用方案：尝试直接访问（仅适用于同域iframe）
+  
   try {
     console.log(`尝试直接访问 ${siteName} iframe内容...`);
     const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
     if (iframeDoc) {
       const result = await extractContentFromDocument(iframeDoc, siteName);
       if (result && result.trim()) {
-        console.log(`✅ 成功直接访问 ${siteName} 内容`);
+        console.log(`✅ Successful直接访问 ${siteName} 内容`);
         return result;
       }
     }
@@ -534,27 +534,27 @@ async function extractIframeContent(iframe, siteName) {
     console.log(`无法直接访问 ${siteName} iframe内容 (跨域限制):`, error.message);
   }
   
-  // 最后备用方案：提供手动复制提示
+  
   console.log(`⚠️ 无法自动提取 ${siteName} 内容，请手动复制`);
   return `无法自动提取 ${siteName} 的详细内容，请手动复制。\n\n提示：您可以：\n1. 在 ${siteName} 页面中手动选择并复制内容\n2. 或者尝试刷新页面后再次导出`;
 }
 
-// 通用思考块过滤器：提取正式回答，过滤思考内容
+
 async function extractContentWithThinkingFilter(element, thinkingBlockFilters, siteName = 'Unknown') {
   try {
     console.log(`🎯 ${siteName} 思考块过滤开始`);
     
-    // 克隆元素以避免修改原始DOM
+    
     const clonedElement = element.cloneNode(true);
     
-    // 移除思考块元素
+    
     if (thinkingBlockFilters && thinkingBlockFilters.length > 0) {
       for (const filter of thinkingBlockFilters) {
         const thinkingBlocks = clonedElement.querySelectorAll(filter);
         console.log(`🎯 找到 ${thinkingBlocks.length} 个思考块元素 (${filter})`);
         
         thinkingBlocks.forEach(block => {
-          // 通用思考块识别规则
+          
           const blockText = block.textContent || '';
           const isThinkingBlock = isThinkingContent(blockText, block);
           
@@ -566,45 +566,45 @@ async function extractContentWithThinkingFilter(element, thinkingBlockFilters, s
       }
     }
     
-    // 提取过滤后的内容
+    
     const content = await extractElementContent(clonedElement);
     console.log(`🎯 ${siteName} 过滤后内容长度:`, content.length);
     
     return content;
   } catch (error) {
-    console.error(`❌ ${siteName} 思考块过滤失败:`, error);
-    // 降级到直接提取
+    console.error(`❌ ${siteName} 思考块过滤Failed:`, error);
+    
     return await extractElementContent(element);
   }
 }
 
-// 通用思考内容识别函数
+
 function isThinkingContent(text, element) {
-  // 文本内容关键词识别（支持多语言）
+  
   const thinkingKeywords = [
-    // 英文关键词
+    
     'thinking', 'thought', 'consider', 'analysis', 'reasoning', 'pondering',
     'reflecting', 'deliberating', 'contemplating', 'processing',
     
-    // 中文关键词
+    
     '思考', '考虑', '分析', '推理', '反思', '琢磨', '思量', '深思',
     '分析中', '思考中', '处理中', '推理过程',
     
-    // 其他语言
-    'réflexion', 'pensée', 'análisis', 'pensamiento', // 法语、西语
-    'nachdenken', 'überlegung', 'analisi', 'riflessione' // 德语、意语
+    
+    'réflexion', 'pensée', 'análisis', 'pensamiento', 
+    'nachdenken', 'überlegung', 'analisi', 'riflessione' 
   ];
   
-  // 检查文本关键词
+  
   const lowerText = text.toLowerCase();
   const hasThinkingKeyword = thinkingKeywords.some(keyword => 
     lowerText.includes(keyword.toLowerCase())
   );
   
-  // DOM特征识别
+  
   const hasThinkingDOMFeatures = 
-    element.querySelector('button[aria-expanded]') || // 可展开的思考块
-    element.classList.contains('transition-all') || // 动画样式的思考块
+    element.querySelector('button[aria-expanded]') || 
+    element.classList.contains('transition-all') || 
     element.classList.contains('thinking') ||
     element.classList.contains('reasoning') ||
     element.querySelector('.thinking') ||
@@ -613,33 +613,33 @@ function isThinkingContent(text, element) {
     element.querySelector('[class*="reasoning"]') ||
     element.querySelector('[class*="analysis"]');
   
-  // 特殊模式识别
+  
   const hasThinkingPatterns = 
-    lowerText.match(/^(thinking|thought|考虑|思考)[:：]?\s*/) || // 以思考开头
-    lowerText.match(/(let me think|让我想想|我来思考)/) || // 思考表达
-    lowerText.match(/\[thinking\]/i) || // 标记格式
-    lowerText.match(/\*thinking\*/i) || // markdown格式
-    element.hasAttribute('data-thinking') || // 特殊属性
-    element.hasAttribute('data-internal'); // 内部思考属性
+    lowerText.match(/^(thinking|thought|考虑|思考)[:：]?\s*/) || 
+    lowerText.match(/(let me think|让我想想|我来思考)/) || 
+    lowerText.match(/\[thinking\]/i) || 
+    lowerText.match(/\*thinking\*/i) || 
+    element.hasAttribute('data-thinking') || 
+    element.hasAttribute('data-internal'); 
   
   return hasThinkingKeyword || hasThinkingDOMFeatures || hasThinkingPatterns;
 }
 
-// 从文档中提取内容
+
 async function extractContentFromDocument(doc, siteName) {
   try {
-    // 获取站点特定的内容提取配置
+    
     const siteConfig = await getSiteContentExtractorConfig(siteName);
-    console.log(`📋 ${siteName} 使用配置:`, siteConfig);
+    console.log(`📋 ${siteName} 使用Config:`, siteConfig);
     
     let responses = [];
     
-    // 使用新的配置结构
+    
     if (siteConfig && siteConfig.messageContainer) {
-      // 方法1: 使用messageContainer查找AI消息容器
+      
       responses = await extractMessagesWithContainer(doc, siteName, siteConfig);
     } else if (siteConfig && siteConfig.contentSelectors) {
-      // 方法2: 使用contentSelectors直接查找内容（向后兼容）
+      
       const content = await extractWithSelectors(doc, siteConfig.contentSelectors, siteConfig.excludeSelectors, siteName);
       if (content.trim()) {
         responses.push({
@@ -649,7 +649,7 @@ async function extractContentFromDocument(doc, siteName) {
         });
       }
     } else if (siteConfig && siteConfig.selectors) {
-      // 方法3: 向后兼容旧配置结构
+      
       const content = await extractWithSelectors(doc, siteConfig.selectors, siteConfig.excludeSelectors, siteName);
       if (content.trim()) {
         responses.push({
@@ -660,7 +660,7 @@ async function extractContentFromDocument(doc, siteName) {
       }
     }
     
-    // 如果没有找到内容，使用fallback方式
+    
     if (responses.length === 0) {
       const fallbackSelectors = siteConfig?.fallbackSelectors || [
         '[data-message-author-role="assistant"]',
@@ -685,7 +685,7 @@ async function extractContentFromDocument(doc, siteName) {
       }
     }
     
-    // 如果还是没有找到内容，返回页面文本
+    
     if (responses.length === 0) {
       const pageText = doc.body ? (doc.body.textContent || doc.body.innerText || '').trim() : '';
       if (pageText) {
@@ -697,7 +697,7 @@ async function extractContentFromDocument(doc, siteName) {
       }
     }
     
-    // 合并多个回答的内容
+    
     if (responses.length > 0) {
       const mainContent = responses.map(r => r.content).join('\n\n---\n\n');
       
@@ -715,14 +715,14 @@ async function extractContentFromDocument(doc, siteName) {
   }
 }
 
-// 使用messageContainer配置提取消息
+
 async function extractMessagesWithContainer(doc, siteName, siteConfig) {
   const responses = [];
   
   try {
     console.log(`🔍 ${siteName} 开始查找消息容器:`, siteConfig.messageContainer);
     
-    // 如果有containerSelector，限定搜索范围
+    
     let searchRoot = doc;
     if (siteConfig.containerSelector) {
       const container = doc.querySelector(siteConfig.containerSelector);
@@ -734,7 +734,7 @@ async function extractMessagesWithContainer(doc, siteName, siteConfig) {
       }
     }
     
-    // 检查编辑模式（如Gemini的textarea编辑状态）
+    
     if (siteConfig.editModeCheck) {
       const editElements = searchRoot.querySelectorAll(siteConfig.editModeCheck);
       if (editElements.length > 0) {
@@ -743,7 +743,7 @@ async function extractMessagesWithContainer(doc, siteName, siteConfig) {
       }
     }
     
-    // 查找所有AI消息容器
+    
     const messageContainers = searchRoot.querySelectorAll(siteConfig.messageContainer);
     console.log(`📝 ${siteName} 找到 ${messageContainers.length} 个消息容器`);
     
@@ -753,7 +753,7 @@ async function extractMessagesWithContainer(doc, siteName, siteConfig) {
     }
     
     for (const [index, container] of messageContainers.entries()) {
-      // 检查是否应该排除此容器
+      
       const shouldExclude = siteConfig.excludeSelectors && siteConfig.excludeSelectors.some(excludeSelector => {
         try {
           return container.matches(excludeSelector) || container.closest(excludeSelector);
@@ -767,7 +767,7 @@ async function extractMessagesWithContainer(doc, siteName, siteConfig) {
         continue;
       }
       
-      // 检查是否包含用户消息（避免提取用户输入）
+      
       if (siteConfig.userMessageSelector) {
         const userMessageElement = container.querySelector(siteConfig.userMessageSelector);
         if (userMessageElement) {
@@ -778,13 +778,13 @@ async function extractMessagesWithContainer(doc, siteName, siteConfig) {
       
       let mainContent = '';
       
-      // 提取主要内容
+      
       if (siteConfig.contentSelectors && siteConfig.contentSelectors.length > 0) {
         for (const contentSelector of siteConfig.contentSelectors) {
           const contentElements = container.querySelectorAll(contentSelector);
           if (contentElements.length > 0) {
             for (const element of contentElements) {
-              // 通用思考块过滤处理
+              
               if (siteConfig.thinkingBlockFilters && siteConfig.thinkingBlockFilters.length > 0) {
                 const filteredContent = await extractContentWithThinkingFilter(
                   element, 
@@ -799,22 +799,22 @@ async function extractMessagesWithContainer(doc, siteName, siteConfig) {
                 const text = await extractElementContent(element);
                 if (text.trim()) {
                   mainContent += (mainContent ? '\n\n' : '') + text.trim();
-                  break; // 找到内容就停止
+                  break; 
                 }
               }
             }
-            if (mainContent) break; // 找到内容就停止尝试其他选择器
+            if (mainContent) break; 
           }
         }
       }
       
-      // 如果没找到主要内容，直接从容器提取
+      
       if (!mainContent) {
         mainContent = await extractElementContent(container);
       }
       
       
-      // 如果找到了有效内容，添加到响应列表
+      
       if (mainContent && mainContent.trim()) {
         responses.push({
           siteName: siteName,
@@ -823,11 +823,11 @@ async function extractMessagesWithContainer(doc, siteName, siteConfig) {
           position: index
         });
         
-        console.log(`✅ ${siteName} 成功提取消息 ${index + 1}`);
+        console.log(`✅ ${siteName} Successful提取消息 ${index + 1}`);
       }
     }
     
-    // 按位置排序消息
+    
     responses.sort((a, b) => a.position - b.position);
     
     console.log(`🎯 ${siteName} 共提取到 ${responses.length} 条有效回答`);
@@ -838,12 +838,12 @@ async function extractMessagesWithContainer(doc, siteName, siteConfig) {
   }
 }
 
-// 使用选择器提取内容
-// 优化版选择器提取内容
+
+
 async function extractWithSelectors(doc, selectors, excludeSelectors = [], siteName = '') {
   let content = '';
   
-  // 使用 Promise.all 并行处理选择器
+  
   const extractionPromises = selectors.map(async (selector) => {
     try {
       const elements = doc.querySelectorAll(selector);
@@ -853,7 +853,7 @@ async function extractWithSelectors(doc, selectors, excludeSelectors = [], siteN
       let selectorContent = '';
       
       for (const [elementIndex, element] of elements.entries()) {
-        // 检查是否应该排除此元素
+        
         const shouldExclude = excludeSelectors && excludeSelectors.some(excludeSelector => {
           try {
             return element.matches(excludeSelector) || element.closest(excludeSelector);
@@ -864,14 +864,14 @@ async function extractWithSelectors(doc, selectors, excludeSelectors = [], siteN
         
         if (shouldExclude) continue;
         
-        // 等待元素内容加载完成
+        
         await waitForContentLoad(element);
         
-        // 尝试提取内容
+        
         let text = await extractElementContent(element);
         
         if (text.trim()) {
-          // 如果有siteName，添加标题，否则直接添加内容
+          
           if (siteName) {
             selectorContent += `\n\n## ${siteName} 回答 ${elementIndex + 1}\n\n${text.trim()}\n`;
             
@@ -883,31 +883,31 @@ async function extractWithSelectors(doc, selectors, excludeSelectors = [], siteN
       
       return selectorContent;
     } catch (error) {
-      console.warn(`选择器 ${selector} 提取失败:`, error);
+      console.warn(`选择器 ${selector} 提取Failed:`, error);
       return '';
     }
   });
   
-  // 等待所有选择器处理完成
+  
   const results = await Promise.all(extractionPromises);
   
-  // 合并结果并返回第一个有效内容
+  
   for (const result of results) {
     if (result.trim()) {
       content = result.trim();
-      break; // 找到第一个有效结果就停止
+      break; 
     }
   }
   
   return content;
 }
 
-// 等待内容加载完成（优化版）
+
 async function waitForContentLoad(element, timeout = 300) {
   return new Promise((resolve) => {
     const startTime = Date.now();
     
-    // 快速检测：如果已经有足够内容，立即返回
+    
     const initialContent = element.textContent || element.innerText || '';
     if (initialContent.trim().length > 20) {
       resolve();
@@ -919,14 +919,14 @@ async function waitForContentLoad(element, timeout = 300) {
       const hasContent = currentContent.trim().length > 10;
       const isTimeout = Date.now() - startTime > timeout;
       
-      // 有内容或超时就返回
+      
       if (hasContent || isTimeout) {
         if (isTimeout) {
-          console.log(`⏰ DOM等待超时(${timeout}ms)，当前内容长度: ${currentContent.length}`);
+          console.log(`⏰ DOMWait超时(${timeout}ms)，当前内容长度: ${currentContent.length}`);
         }
         resolve();
       } else {
-        // 减少检查频率，从50ms改为100ms
+        
         setTimeout(checkContent, 100);
       }
     };
@@ -935,16 +935,16 @@ async function waitForContentLoad(element, timeout = 300) {
   });
 }
 
-// 提取元素内容（优化版）
+
 async function extractElementContent(element) {
   let text = '';
   
   try {
-    // 方法1: 检查是否是 markdown 容器，直接使用 innerHTML
+    
     if (element.classList.contains('markdown') || 
         element.classList.contains('response-content-markdown') ||
         element.classList.contains('prose')) {
-      // ChatGPT、GROK 等站点的 markdown 容器，直接使用 innerHTML 然后转换
+      
       const html = element.innerHTML || '';
       if (html.trim()) {
         text = convertHtmlToMarkdown(html);
@@ -952,40 +952,40 @@ async function extractElementContent(element) {
         text = element.textContent || element.innerText || '';
       }
     } else if (element.dataset.markdown) {
-      // 方法2: 尝试获取 markdown 属性或数据
+      
       text = element.dataset.markdown;
     } else if (element.getAttribute('data-markdown')) {
       text = element.getAttribute('data-markdown');
     } else {
-      // 方法3: 使用 innerHTML 保留格式，然后转换为 markdown
+      
       const html = element.innerHTML || '';
       if (html.trim()) {
         text = convertHtmlToMarkdown(html);
       } else {
-        // 方法4: 降级到纯文本
+        
         text = element.textContent || element.innerText || '';
       }
     }
     
-    // 清理和优化文本
+    
     text = cleanExtractedText(text);
     
   } catch (error) {
-    console.warn('提取元素内容失败:', error);
+    console.warn('提取元素内容Failed:', error);
     text = element.textContent || element.innerText || '';
   }
   
   return text;
 }
 
-// 清理提取的文本
+
 function cleanExtractedText(text) {
   if (!text) return '';
   
-  // 移除多余的空白字符
+  
   text = text.replace(/\s+/g, ' ').trim();
   
-  // 移除常见的无用内容
+  
   const unwantedPatterns = [
     /^Loading\.\.\.$/i,
     /^Please wait\.\.\.$/i,
@@ -1001,42 +1001,42 @@ function cleanExtractedText(text) {
   return text.trim();
 }
 
-// 获取站点特定的内容提取配置
+
 async function getSiteContentExtractorConfig(siteName) {
   try {
-    console.log(`🔍 开始获取 ${siteName} 的配置...`);
+    console.log(`🔍 开始获取 ${siteName} 的Config...`);
     
-    // 优先使用新的统一站点检测器
+    
     if (window.siteDetector) {
-      console.log('📡 使用 siteDetector 获取配置...');
+      console.log('📡 使用 siteDetector 获取Config...');
       const sites = await window.siteDetector.getSites();
-      console.log(`📋 获取到 ${sites.length} 个站点配置`);
+      console.log(`📋 获取到 ${sites.length} 个SiteConfig`);
       
       const site = sites.find(s => s.name === siteName);
       console.log(`🎯 查找 ${siteName}:`, site ? '找到' : '未找到');
       
       if (site && site.contentExtractor) {
-        console.log(`✅ 使用新检测器找到 ${siteName} 的内容提取配置:`, site.contentExtractor);
+        console.log(`✅ 使用新检测器找到 ${siteName} 的内容提取Config:`, site.contentExtractor);
         return site.contentExtractor;
       } else if (site) {
-        console.log(`⚠️ ${siteName} 站点存在但无 contentExtractor:`, site);
+        console.log(`⚠️ ${siteName} Site存在但无 contentExtractor:`, site);
       }
     }
     
-    // 降级到原有逻辑
+    
     if (typeof window.getDefaultSites === 'function') {
-      console.log('📡 使用 getDefaultSites 获取配置...');
+      console.log('📡 使用 getDefaultSites 获取Config...');
       const sites = await window.getDefaultSites();
-      console.log(`📋 获取到 ${sites.length} 个站点配置`);
+      console.log(`📋 获取到 ${sites.length} 个SiteConfig`);
       
       const site = sites.find(s => s.name === siteName);
       console.log(`🎯 查找 ${siteName}:`, site ? '找到' : '未找到');
       
       if (site && site.contentExtractor) {
-        console.log(`✅ 使用 getDefaultSites 找到 ${siteName} 的内容提取配置:`, site.contentExtractor);
+        console.log(`✅ 使用 getDefaultSites 找到 ${siteName} 的内容提取Config:`, site.contentExtractor);
         return site.contentExtractor;
       } else if (site) {
-        console.log(`⚠️ ${siteName} 站点存在但无 contentExtractor:`, site);
+        console.log(`⚠️ ${siteName} Site存在但无 contentExtractor:`, site);
       }
       
       return site?.contentExtractor || null;
@@ -1045,12 +1045,12 @@ async function getSiteContentExtractorConfig(siteName) {
       return null;
     }
   } catch (error) {
-    console.error('获取站点配置失败:', error);
+    console.error('获取SiteConfigFailed:', error);
     return null;
   }
 }
 
-// 通过消息通信请求iframe内容
+
 function requestIframeContent(iframe, siteName) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -1061,7 +1061,7 @@ function requestIframeContent(iframe, siteName) {
       if (event.data.type === 'EXTRACTED_CONTENT' && event.data.siteName === siteName) {
         clearTimeout(timeout);
         window.removeEventListener('message', messageHandler);
-        // 返回包含内容和URL的对象
+        
         resolve({
           content: event.data.content,
           url: event.data.url || iframe.src
@@ -1071,7 +1071,7 @@ function requestIframeContent(iframe, siteName) {
     
     window.addEventListener('message', messageHandler);
     
-    // 发送提取内容请求
+    
     iframe.contentWindow.postMessage({
       type: 'EXTRACT_CONTENT',
       siteName: siteName
@@ -1079,20 +1079,20 @@ function requestIframeContent(iframe, siteName) {
   });
 }
 
-// 生成预览内容（优化版）
+
 function generatePreview(responses, format) {
   if (responses.length === 0) {
     return '没有找到可导出的内容';
   }
   
   let preview = '';
-  const maxPreviewLength = 150; // 减少预览长度，提升性能
+  const maxPreviewLength = 150; 
   
   responses.forEach((response) => {
       if (format === 'markdown') {
         preview += `## ${response.siteName}\n\n`;
         
-        // 添加URL信息
+        
         if (response.url && response.url !== 'unknown') {
           preview += `**URL:** ${response.url}\n\n`;
         }
@@ -1106,7 +1106,7 @@ function generatePreview(responses, format) {
       } else if (format === 'html') {
         preview += `<h3>${response.siteName}</h3>\n`;
         
-        // 添加URL信息
+        
         if (response.url && response.url !== 'unknown') {
           preview += `<p><strong>URL:</strong> <a href="${response.url}" target="_blank">${response.url}</a></p>\n`;
         }
@@ -1122,7 +1122,7 @@ function generatePreview(responses, format) {
       } else { // txt format
         preview += `${response.siteName}:\n`;
         
-        // 添加URL信息
+        
         if (response.url && response.url !== 'unknown') {
           preview += `URL: ${response.url}\n\n`;
         }
@@ -1139,7 +1139,7 @@ function generatePreview(responses, format) {
   return preview;
 }
 
-// 生成导出内容
+
 function generateExportContent(responses, format) {
   const timestamp = new Date().toLocaleString();
   const query = document.getElementById('searchInput').value || '未指定查询';
@@ -1150,20 +1150,20 @@ function generateExportContent(responses, format) {
     content = `# AI回答汇总\n\n`;
     content += `**查询内容:** ${query}\n`;
     content += `**导出时间:** ${timestamp}\n`;
-    content += `**包含站点:** ${responses.length} 个\n\n`;
+    content += `**包含Site:** ${responses.length} 个\n\n`;
     content += `---\n\n`;
     
     responses.forEach((response, responseIndex) => {
       content += `## ${response.siteName}\n\n`;
       
-      // 添加 iframe 的完整 URL
+      
       if (response.url && response.url !== 'unknown') {
         content += `**URL:** ${response.url}\n\n`;
       }
       
       content += response.content + '\n\n';
       
-      // 提取方法只在控制台输出，不显示给用户
+      
       if (response.extractionMethod) {
         console.log(`📊 ${response.siteName} 提取方法: ${response.extractionMethod}`);
       }
@@ -1195,20 +1195,20 @@ function generateExportContent(responses, format) {
     <div class="meta">
         <p><strong>查询内容:</strong> ${query}</p>
         <p><strong>导出时间:</strong> ${timestamp}</p>
-        <p><strong>包含站点:</strong> ${responses.length} 个</p>
+        <p><strong>包含Site:</strong> ${responses.length} 个</p>
     </div>`;
     
     responses.forEach((response, responseIndex) => {
       content += `<h2>${response.siteName}</h2>`;
       
-      // 添加 iframe 的完整 URL
+      
       if (response.url && response.url !== 'unknown') {
         content += `<p><strong>URL:</strong> <a href="${response.url}" target="_blank">${response.url}</a></p>`;
       }
       
       content += `<div>${response.content.replace(/\n/g, '<br>')}</div>`;
       
-      // 提取方法只在控制台输出，不显示给用户
+      
       if (response.extractionMethod) {
         console.log(`📊 ${response.siteName} 提取方法: ${response.extractionMethod}`);
       }
@@ -1224,21 +1224,21 @@ function generateExportContent(responses, format) {
     content = `AI回答汇总\n\n`;
     content += `查询内容: ${query}\n`;
     content += `导出时间: ${timestamp}\n`;
-    content += `包含站点: ${responses.length} 个\n\n`;
+    content += `包含Site: ${responses.length} 个\n\n`;
     content += `${'='.repeat(50)}\n\n`;
     
     responses.forEach((response, responseIndex) => {
       content += `${response.siteName}\n`;
       content += `${'-'.repeat(response.siteName.length)}\n\n`;
       
-      // 添加 iframe 的完整 URL
+      
       if (response.url && response.url !== 'unknown') {
         content += `URL: ${response.url}\n\n`;
       }
       
       content += response.content + '\n\n';
       
-      // 提取方法只在控制台输出，不显示给用户
+      
       if (response.extractionMethod) {
         console.log(`📊 ${response.siteName} 提取方法: ${response.extractionMethod}`);
       }
@@ -1250,7 +1250,7 @@ function generateExportContent(responses, format) {
   return content;
 }
 
-// 执行导出
+
 async function exportContent(content, format) {
   const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
   const query = document.getElementById('searchInput').value || 'AI回答';
@@ -1265,7 +1265,7 @@ async function exportContent(content, format) {
   }
 }
 
-// 下载文件
+
 function downloadFile(content, filename, mimeType) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -1280,26 +1280,26 @@ function downloadFile(content, filename, mimeType) {
   URL.revokeObjectURL(url);
 }
 
-// HTML到Markdown转换函数（优化版）
+
 function convertHtmlToMarkdown(html) {
   try {
     if (!html || typeof html !== 'string') return '';
     
-    // 创建临时容器来解析HTML
+    
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = html;
     
-    // 移除script和style标签
+    
     tempDiv.querySelectorAll('script, style').forEach(el => el.remove());
     
-    // 获取处理后的HTML
+    
     let markdown = tempDiv.innerHTML
-      // 代码块（需要在其他处理之前）
+      
       .replace(/<pre[^>]*><code[^>]*class="[^"]*language-([^"]*)"[^>]*>(.*?)<\/code><\/pre>/gis, '```$1\n$2\n```\n\n')
       .replace(/<pre[^>]*><code[^>]*>(.*?)<\/code><\/pre>/gis, '```\n$1\n```\n\n')
       .replace(/<pre[^>]*>(.*?)<\/pre>/gis, '```\n$1\n```\n\n')
       
-      // 标题（h1-h6）
+      
       .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n')
       .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n')
       .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n')
@@ -1307,19 +1307,19 @@ function convertHtmlToMarkdown(html) {
       .replace(/<h5[^>]*>(.*?)<\/h5>/gi, '##### $1\n\n')
       .replace(/<h6[^>]*>(.*?)<\/h6>/gi, '###### $1\n\n')
       
-      // 粗体和斜体
+      
       .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
       .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
       .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
       .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
       
-      // 链接
+      
       .replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
       
-      // 行内代码
+      
       .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`')
       
-      // 列表处理
+      
       .replace(/<ul[^>]*>(.*?)<\/ul>/gis, (match, content) => {
         const items = content.replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n');
         return items + '\n';
@@ -1330,14 +1330,14 @@ function convertHtmlToMarkdown(html) {
         return items + '\n';
       })
       
-      // 引用
+      
       .replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gis, (match, content) => {
         return content.split('\n').map(line => '> ' + line.trim()).join('\n') + '\n\n';
       })
       
-      // 表格（基础支持）
+      
       .replace(/<table[^>]*>(.*?)<\/table>/gis, (match, content) => {
-        // 简化的表格处理
+        
         const rows = content.match(/<tr[^>]*>(.*?)<\/tr>/gi);
         if (rows && rows.length > 0) {
           let tableMarkdown = '';
@@ -1362,20 +1362,20 @@ function convertHtmlToMarkdown(html) {
         return content;
       })
       
-      // 段落和div
+      
       .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
       .replace(/<div[^>]*>(.*?)<\/div>/gi, '$1\n')
       
-      // 换行
+      
       .replace(/<br[^>]*\/?>/gi, '\n')
       
-      // 水平线
+      
       .replace(/<hr[^>]*\/?>/gi, '\n---\n\n')
       
-      // 清理HTML标签
+      
       .replace(/<[^>]+>/g, '')
       
-      // HTML实体解码
+      
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&amp;/g, '&')
@@ -1383,14 +1383,14 @@ function convertHtmlToMarkdown(html) {
       .replace(/&#39;/g, "'")
       .replace(/&nbsp;/g, ' ')
       
-      // 清理多余的空行
+      
       .replace(/\n{3,}/g, '\n\n')
       .trim();
     
     return markdown;
   } catch (error) {
-    console.warn('HTML转Markdown失败:', error);
-    // 降级到纯文本
+    console.warn('HTML转MarkdownFailed:', error);
+    
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = html;
     return tempDiv.textContent || tempDiv.innerText || '';

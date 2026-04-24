@@ -1,7 +1,7 @@
 // analytics.js
 
 const ANALYTICS_EVENTS = {
-  // 首页相关
+  
   HOMEPAGE_SEARCH_SUBMIT: 'homepage_search_submit',
   HOMEPAGE_UPLOAD_CLICK: 'homepage_upload_click',
   HOMEPAGE_SITE_TOGGLE: 'homepage_site_toggle',
@@ -13,17 +13,17 @@ const ANALYTICS_EVENTS = {
   HOMEPAGE_SAVE_FAVORITE_SITES: 'homepage_save_favorite_sites',
   HOMEPAGE_PROMPT_TEMPLATES_SETTINGS_CLICK: 'homepage_prompt_templates_settings_click',
 
-  // iframe 主功能相关
+  
   IFRAME_SEARCH_SUBMIT: 'iframe_search_submit',
   IFRAME_UPLOAD_CLICK: 'iframe_upload_click',
   IFRAME_EXPORT_CLICK: 'iframe_export_click',
   IFRAME_SITE_TOGGLE: 'iframe_site_toggle',
 
-  // iframe 站点收藏相关
+  
   IFRAME_SITE_FAVORITE_TOGGLE: 'iframe_site_favorite_toggle',
   IFRAME_FAVORITE_ALL_IFRAMES: 'iframe_favorite_all_iframes',
 
-  // iframe 提示词收藏相关
+  
   IFRAME_PROMPT_FAVORITE_TOGGLE: 'iframe_prompt_favorite_toggle',
   IFRAME_PROMPT_FAVORITES_OPEN: 'iframe_prompt_favorites_open',
   IFRAME_PROMPT_FAVORITE_SELECT: 'iframe_prompt_favorite_select',
@@ -55,14 +55,14 @@ async function loadAnalyticsConfig() {
     return analyticsConfigCache;
   } catch (error) {
     if (!hasWarnedMissingConfig) {
-      console.warn('Analytics 配置加载失败:', error);
+      console.warn('Analytics ConfigLoadFailed:', error);
       hasWarnedMissingConfig = true;
     }
     return null;
   }
 }
 
-// 获取或生成唯一的 Client ID (保证同一个用户的数据连贯)
+
 async function getOrCreateClientId() {
   const result = await chrome.storage.local.get('clientId');
   let clientId = result.clientId;
@@ -73,7 +73,7 @@ async function getOrCreateClientId() {
   return clientId;
 }
 
-// 核心发送函数
+
 async function logEvent(name, params = {}) {
   const analyticsConfig = await loadAnalyticsConfig();
   if (!analyticsConfig || analyticsConfig.enabled !== true) {
@@ -85,7 +85,7 @@ async function logEvent(name, params = {}) {
 
   if (!measurementId || !apiSecret) {
     if (!hasWarnedMissingConfig) {
-      console.warn('Analytics 配置不完整，请检查 measurementId 和 apiSecret');
+      console.warn('Analytics Config不完整，请Check measurementId 和 apiSecret');
       hasWarnedMissingConfig = true;
     }
     return;
@@ -93,14 +93,14 @@ async function logEvent(name, params = {}) {
 
   const clientId = await getOrCreateClientId();
 
-  // 这里的 fetch 请求是核心
+  
   fetch(`https://www.google-analytics.com/mp/collect?measurement_id=${measurementId}&api_secret=${apiSecret}`, {
     method: "POST",
     body: JSON.stringify({
       client_id: clientId,
       events: [{
-        name: name,     // 事件名称 (例如: 'click_translate')
-        params: params  // 额外参数 (例如: { language: 'en' })
+        name: name,     
+        params: params  
       }]
     })
   });
