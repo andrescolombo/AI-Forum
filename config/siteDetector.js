@@ -1,4 +1,24 @@
 
+class SiteDetector {
+  constructor() {
+    this.sitesCache = null;
+    this.cacheTimestamp = 0;
+    this.cacheTimeout = 5 * 60 * 1000; // 5 min cache
+    this.domainMappingsCache = null;
+
+    this.performanceStats = {
+      cacheHits: 0,
+      cacheMisses: 0,
+      storageReads: 0,
+      fallbackReads: 0,
+      totalRequests: 0,
+      averageResponseTime: 0
+    };
+
+    this.adaptiveCacheTimeout = this.cacheTimeout;
+    this.lastUpdateTime = 0;
+  }
+
   async getSites() {
     const startTime = performance.now();
     this.performanceStats.totalRequests++;
@@ -331,19 +351,16 @@ const siteDetector = new SiteDetector();
 
 
 if (typeof window !== 'undefined') {
-  
   window.siteDetector = siteDetector;
   window.getSiteHandler = (domain) => siteDetector.getSiteHandler(domain);
   window.isAISite = (domain) => siteDetector.isAISite(domain);
   window.getSiteNameFromDomain = (domain) => siteDetector.getSiteNameFromDomain(domain);
 } else if (typeof self !== 'undefined') {
-  
   self.siteDetector = siteDetector;
   self.getSiteHandler = (domain) => siteDetector.getSiteHandler(domain);
   self.isAISite = (domain) => siteDetector.isAISite(domain);
   self.getSiteNameFromDomain = (domain) => siteDetector.getSiteNameFromDomain(domain);
 }
-
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { SiteDetector, siteDetector };
