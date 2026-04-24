@@ -210,13 +210,13 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (sites && sites.length > 0) {
                     
                     if (selectedSiteNames && selectedSiteNames.length > 0) {
-                        let availableSites = sites.filter(site => 
+                        let availableSites = sites.filter(site =>
                             selectedSiteNames.includes(site.name) &&
-                            site.supportIframe !== false && 
+                            (site.supportIframe !== false || site.supportUrlQuery === true) &&
                             !site.hidden
                         );
                         console.log('根据选中的Site列表过滤:', selectedSiteNames, availableSites);
-                        
+
                         if (availableSites.length > 0) {
                             console.log('使用查询内容创建 iframes:', query, availableSites);
                             createIframes(query, availableSites);
@@ -224,10 +224,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                             console.log('没有可用的Site');
                         }
                     } else {
-                        
-                        let availableSites = sites.filter(site => 
-                            site.enabled && 
-                            site.supportIframe !== false && 
+
+                        let availableSites = sites.filter(site =>
+                            site.enabled &&
+                            (site.supportIframe !== false || site.supportUrlQuery === true) &&
                             !site.hidden
                         );
 
@@ -241,19 +241,19 @@ document.addEventListener('DOMContentLoaded', async function() {
                 }
             });
         } else {
-            
+
             console.log('URL 参数 query=true，按直接打开处理');
             getDefaultSites().then((sites) => {
                 if (sites && sites.length > 0) {
-                    
+
                     if (selectedSiteNames && selectedSiteNames.length > 0) {
-                        let availableSites = sites.filter(site => 
+                        let availableSites = sites.filter(site =>
                             selectedSiteNames.includes(site.name) &&
-                            site.supportIframe !== false && 
+                            (site.supportIframe !== false || site.supportUrlQuery === true) &&
                             !site.hidden
                         );
                         console.log('根据选中的Site列表过滤:', selectedSiteNames, availableSites);
-                        
+
                         if (availableSites.length > 0) {
                             console.log('初始化可用Site:', availableSites);
                             createIframes('', availableSites);
@@ -261,10 +261,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                             console.log('没有可用的Site');
                         }
                     } else {
-                        
-                        let availableSites = sites.filter(site => 
-                            site.enabled && 
-                            site.supportIframe !== false && 
+
+                        let availableSites = sites.filter(site =>
+                            site.enabled &&
+                            (site.supportIframe !== false || site.supportUrlQuery === true) &&
                             !site.hidden
                         );
 
@@ -279,18 +279,18 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
         }
     } else {
-        
+
         getDefaultSites().then((sites) => {
             if (sites && sites.length > 0) {
-                
+
                 if (selectedSiteNames && selectedSiteNames.length > 0) {
-                    let availableSites = sites.filter(site => 
+                    let availableSites = sites.filter(site =>
                         selectedSiteNames.includes(site.name) &&
-                        site.supportIframe !== false && 
+                        (site.supportIframe !== false || site.supportUrlQuery === true) &&
                         !site.hidden
                     );
                     console.log('根据选中的Site列表过滤:', selectedSiteNames, availableSites);
-                    
+
                     if (availableSites.length > 0) {
                         console.log('初始化可用Site:', availableSites);
                         createIframes('', availableSites);
@@ -298,10 +298,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                         console.log('没有可用的Site');
                     }
                 } else {
-                    
-                    let availableSites = sites.filter(site => 
-                        site.enabled && 
-                        site.supportIframe !== false && 
+
+                    let availableSites = sites.filter(site =>
+                        site.enabled &&
+                        (site.supportIframe !== false || site.supportUrlQuery === true) &&
                         !site.hidden
                     );
 
@@ -941,7 +941,22 @@ async function createIframes(query, sites) {
     container.style.marginLeft = '72px';
     
     enabledSites.forEach(site => {
-      
+
+      // Sites that only support URL query (no iframe) open in a new tab
+      if (site.supportUrlQuery === true && site.supportIframe === false) {
+        if (query) {
+          const externalUrl = site.url.replace('{query}', encodeURIComponent(query));
+          window.open(externalUrl, '_blank');
+        }
+        // Show a placeholder card in the panel
+        const placeholder = document.createElement('div');
+        placeholder.className = 'iframe-container';
+        placeholder.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#f9f9f9;border:1px solid #e0e0e0;border-radius:8px;color:#555;font-size:14px;';
+        placeholder.innerHTML = `<strong style="font-size:16px;">${site.name}</strong><span>Abierto en nueva pestaña</span>`;
+        container.appendChild(placeholder);
+        return;
+      }
+
       let url;
       if (!query) {
         try {
@@ -952,12 +967,12 @@ async function createIframes(query, sites) {
           url = site.url;
         }
       } else {
-        url = site.supportUrlQuery 
+        url = site.supportUrlQuery
         ? site.url.replace('{query}', encodeURIComponent(query))
         : site.url;
       }
-        
-      console.log("即将开始调用创建单个 iframe",site.name, url)
+
+      console.log("即将开始调用创建单个 iframe", site.name, url)
       createSingleIframe(site.name, url, container, query);
     });
   } catch (error) {
@@ -1575,8 +1590,8 @@ async function initializeSiteSettings() {
         const sites = await getDefaultSites();
         
         
-        const supportedSites = sites.filter(site => 
-            site.supportIframe === true && !site.hidden
+        const supportedSites = sites.filter(site =>
+            (site.supportIframe === true || site.supportUrlQuery === true) && !site.hidden
         );
 
         const fragment = document.createDocumentFragment();
@@ -3731,38 +3746,4 @@ function showFileUploadError(message) {
   error.style.cssText = `
     position: fixed;
     top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
-    color: white;
-    padding: 16px 24px;
-    border-radius: 12px;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-    z-index: 10001;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
-    max-width: 400px;
-    text-align: center;
-    animation: slideInScale 0.3s ease-out;
-  `;
-  
-  error.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-      <span style="font-size: 18px;">❌</span>
-      <span style="font-weight: 600;">文件上传Failed</span>
-    </div>
-    <div style="font-size: 13px; opacity: 0.9;">${message}</div>
-  `;
-  
-  document.body.appendChild(error);
-  
-  
-  setTimeout(() => {
-    if (error.parentElement) {
-      error.remove();
-    }
-  }, 3000);
-}
-
-
-
+   

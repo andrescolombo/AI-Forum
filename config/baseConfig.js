@@ -530,20 +530,22 @@ else {
   
   window.getDefaultSites = async function() {
     try {
-      
-      
-      let baseSites = [];
+
+      // Always load local siteHandlers.json first — it's the source of truth
+      // for structural properties (hidden, supportIframe, supportUrlQuery, url, name).
+      let localSites = [];
       try {
-        const result = await chrome.storage.local.get('remoteSiteHandlers');
-        if (result.remoteSiteHandlers && result.remoteSiteHandlers.sites && result.remoteSiteHandlers.sites.length > 0) {
-          baseSites = result.remoteSiteHandlers.sites;
-          console.log('从 remoteSiteHandlers LoadSiteConfigSuccessful');
+        const response = await fetch(chrome.runtime.getURL('config/siteHandlers.json'));
+        if (response.ok) {
+          const localConfig = await response.json();
+          localSites = localConfig.sites || localConfig || [];
+          console.log('从本地文件LoadSiteConfigSuccessful, 数量:', localSites.length);
         }
       } catch (error) {
-        console.error('从 remoteSiteHandlers 读取ConfigFailed:', error);
+        console.error('从本地文件LoadConfigFailed:', error);
       }
-      
-      
+
+      // Load user preferences (enabled, order) from sync storage
       let userSettings = {};
       try {
         const { sites: userSiteSettings = {} } = await chrome.storage.sync.get('sites');
@@ -552,9 +554,11 @@ else {
       } catch (error) {
         console.error('从 chrome.storage.sync 读取用户SettingsFailed:', error);
       }
-      
-      
-      if (baseSites && baseSites.length > 0) {
+
+      // Use local sites as base, apply only user preferences on top
+      const baseSites = localSites.length > 0 ? localSites : [];
+
+      if (baseSites.length > 0) {
         const mergedSites = baseSites.map(site => {
           const userSiteData = userSettings[site.name] || {};
           return {
@@ -563,32 +567,17 @@ else {
             enabled: userSiteData.enabled !== undefined ? userSiteData.enabled : site.enabled
           };
         });
-        
-        
+
         mergedSites.sort((a, b) => {
           const orderA = a.order !== undefined ? a.order : 999;
           const orderB = b.order !== undefined ? b.order : 999;
           return orderA - orderB;
         });
-        
+
         console.log('合并ConfigSuccessful，Site数量:', mergedSites.length);
         return mergedSites;
       }
-      
-      
-      try {
-        const response = await fetch(chrome.runtime.getURL('config/siteHandlers.json'));
-        if (response.ok) {
-          const localConfig = await response.json();
-          if (localConfig.sites && localConfig.sites.length > 0) {
-            console.log('从本地文件LoadSiteConfigSuccessful');
-            return localConfig.sites;
-          }
-        }
-      } catch (error) {
-        console.error('从本地文件LoadConfigFailed:', error);
-      }
-      
+
       return [];
     } catch (error) {
       console.error('获取默认SiteConfigFailed:', error);
@@ -630,3 +619,4 @@ else {
 
 } 
 
+                                                                                                                                                                                                                                

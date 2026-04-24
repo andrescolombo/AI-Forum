@@ -351,8 +351,8 @@ async function initializeSitesList() {
         const sites = await getDefaultSites();
         
         
-        const supportedSites = sites.filter(site => 
-            site.supportIframe === true && !site.hidden
+        const supportedSites = sites.filter(site =>
+            (site.supportIframe === true || site.supportUrlQuery === true) && !site.hidden
         );
         
         console.log('从getDefaultSites() 获取的可以使用的Site:', supportedSites.map(site => ({ name: site.name, enabled: site.enabled })));
@@ -708,7 +708,4 @@ function showToast(message, duration = 2000) {
             if (toast.parentElement) {
                 toast.remove();
             }
-        }, 300);
-    }, duration);
-}
-
+        
