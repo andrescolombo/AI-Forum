@@ -38,37 +38,46 @@ class SiteDetector {
 
     try {
       let sites = [];
-      
-      
-      try {
-        this.performanceStats.storageReads++;
-        const result = await chrome.storage.local.get('remoteSiteHandlers');
-        sites = result.remoteSiteHandlers?.sites || [];
-        if (sites.length > 0) {
-          console.log('✅ 从 chrome.storage.local LoadSiteConfigSuccessful，数量:', sites.length);
-          console.log('📊 本地存储Config详情:', {
-            totalSites: sites.length,
-            hasContentExtractor: sites.filter(s => s.contentExtractor).length,
-            hasSearchHandler: sites.filter(s => s.searchHandler).length,
-            hasFileUploadHandler: sites.filter(s => s.fileUploadHandler).length
-          });
-        } else {
-          console.log('⚠️ chrome.storage.local 中的SiteConfig为空');
-        }
-      } catch (storageError) {
-        console.warn('❌ 从 chrome.storage.local 读取ConfigFailed:', storageError);
-        console.warn('💡 可能的原因: 存储权限问题、数据损坏或首次使用');
-      }
-      
-      
-      if (!sites || sites.length === 0) {
-        this.performanceStats.fallbackReads++;
-        if (typeof window !== 'undefined' && window.getDefaultSites) {
+
+      // Prefer getDefaultSites() which merges local JSON (structural truth) + remote cache
+      // (rich handlers) + user prefs. This ensures local fixes (e.g. ProseMirror for Claude)
+      // are never overwritten by a stale upstream remote config.
+      if (typeof window !== 'undefined' && window.getDefaultSites) {
+        try {
+          this.performanceStats.fallbackReads++;
           sites = await window.getDefaultSites();
-          console.log('✅ 从 getDefaultSites LoadSiteConfigSuccessful，数量:', sites.length);
-        } else if (typeof self !== 'undefined' && self.getDefaultSites) {
+          if (sites.length > 0) {
+            console.log('✅ 从 getDefaultSites LoadSiteConfigSuccessful，数量:', sites.length);
+          }
+        } catch (error) {
+          console.warn('❌ 从 getDefaultSites 读取ConfigFailed:', error);
+        }
+      } else if (typeof self !== 'undefined' && self.getDefaultSites) {
+        try {
+          this.performanceStats.fallbackReads++;
           sites = await self.getDefaultSites();
-          console.log('✅ 从 Service Worker getDefaultSites LoadSiteConfigSuccessful，数量:', sites.length);
+          if (sites.length > 0) {
+            console.log('✅ 从 Service Worker getDefaultSites LoadSiteConfigSuccessful，数量:', sites.length);
+          }
+        } catch (error) {
+          console.warn('❌ 从 Service Worker getDefaultSites 读取ConfigFailed:', error);
+        }
+      }
+
+      // Fallback: read raw from chrome.storage.local if getDefaultSites is unavailable
+      if (!sites || sites.length === 0) {
+        try {
+          this.performanceStats.storageReads++;
+          const result = await chrome.storage.local.get('remoteSiteHandlers');
+          sites = result.remoteSiteHandlers?.sites || [];
+          if (sites.length > 0) {
+            console.log('✅ 从 chrome.storage.local LoadSiteConfigSuccessful，数量:', sites.length);
+          } else {
+            console.log('⚠️ chrome.storage.local 中的SiteConfig为空');
+          }
+        } catch (storageError) {
+          console.warn('❌ 从 chrome.storage.local 读取ConfigFailed:', storageError);
+          console.warn('💡 可能的原因: 存储权限问题、数据损坏或首次使用');
         }
       }
 
