@@ -942,21 +942,6 @@ async function createIframes(query, sites) {
     
     enabledSites.forEach(site => {
 
-      // Sites that only support URL query (no iframe) open in a new tab
-      if (site.supportUrlQuery === true && site.supportIframe === false) {
-        if (query) {
-          const externalUrl = site.url.replace('{query}', encodeURIComponent(query));
-          window.open(externalUrl, '_blank');
-        }
-        // Show a placeholder card in the panel
-        const placeholder = document.createElement('div');
-        placeholder.className = 'iframe-container';
-        placeholder.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#f9f9f9;border:1px solid #e0e0e0;border-radius:8px;color:#555;font-size:14px;';
-        placeholder.innerHTML = `<strong style="font-size:16px;">${site.name}</strong><span>Abierto en nueva pestaña</span>`;
-        container.appendChild(placeholder);
-        return;
-      }
-
       let url;
       if (!query) {
         try {
@@ -3746,4 +3731,38 @@ function showFileUploadError(message) {
   error.style.cssText = `
     position: fixed;
     top: 50%;
-   
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    color: white;
+    padding: 16px 24px;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    z-index: 10001;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    max-width: 400px;
+    text-align: center;
+    animation: slideInScale 0.3s ease-out;
+  `;
+  
+  error.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <span style="font-size: 18px;">❌</span>
+      <span style="font-weight: 600;">文件上传Failed</span>
+    </div>
+    <div style="font-size: 13px; opacity: 0.9;">${message}</div>
+  `;
+  
+  document.body.appendChild(error);
+  
+  
+  setTimeout(() => {
+    if (error.parentElement) {
+      error.remove();
+    }
+  }, 3000);
+}
+
+
+

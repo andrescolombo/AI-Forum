@@ -708,4 +708,7 @@ function showToast(message, duration = 2000) {
             if (toast.parentElement) {
                 toast.remove();
             }
-        
+        }, 300);
+    }, duration);
+}
+

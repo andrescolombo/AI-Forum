@@ -1841,8 +1841,7 @@
       "supportUrlQuery": true,
       "region": "US",
       "hidden": false,
-      "supportIframe": false,
-      "note": "iframe页面下，打不开网页了，暂时无法使用",
+      "supportIframe": true,
       "searchHandler": {
         "steps": [
           {
