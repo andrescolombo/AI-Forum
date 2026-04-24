@@ -1646,6 +1646,61 @@ window.addEventListener('message', async function(event) {
     }
 
     
+
+    // ── Ollama: watch for response completion ──────────────────────────────
+    if (event.data.type === 'WATCH_FOR_RESPONSE') {
+        const siteName = event.data.siteName;
+        console.log(`🤖 Ollama: starting response watch for ${siteName}`);
+
+        let lastContent = '';
+        let stableCount = 0;
+        const POLL_MS = 2500;
+        const STABLE_NEEDED = 2;   // 2 consecutive identical polls = done
+        const MAX_MS = 120000;     // 2 min hard cap
+        const startTime = Date.now();
+
+        const poll = async () => {
+            if (Date.now() - startTime > MAX_MS) {
+                window.parent.postMessage({
+                    type: 'RESPONSE_COMPLETE',
+                    siteName,
+                    content: lastContent || '(no response captured)',
+                    timedOut: true
+                }, '*');
+                return;
+            }
+            try {
+                const content = await extractPageContent();
+                if (content && content.length > 60) {
+                    if (content === lastContent) {
+                        stableCount++;
+                        if (stableCount >= STABLE_NEEDED) {
+                            console.log(`🤖 Ollama: ${siteName} response stable — sending`);
+                            window.parent.postMessage({
+                                type: 'RESPONSE_COMPLETE',
+                                siteName,
+                                content,
+                                timedOut: false
+                            }, '*');
+                            return;
+                        }
+                    } else {
+                        stableCount = 0;
+                        lastContent = content;
+                    }
+                }
+            } catch (e) {
+                console.warn('🤖 Ollama poll error:', e);
+            }
+            setTimeout(poll, POLL_MS);
+        };
+
+        // Start polling after a small delay so the AI has begun responding
+        setTimeout(poll, 4000);
+        return;
+    }
+    // ── End Ollama watch ───────────────────────────────────────────────────
+
     if (event.data.type !== 'TRIGGER_PASTE' && !event.data.query) {
         return;
     }
