@@ -1588,11 +1588,18 @@ document.getElementById('searchInput').addEventListener('focus', (e) => {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    
     const searchButton = document.getElementById('searchButton');
     if (searchButton) {
-        // Don't replace the icon (SVG arrow) with the i18n message — only set the tooltip.
+        
         const buttonText = chrome.i18n.getMessage('startCompare');
-        if (buttonText) searchButton.title = buttonText;
+        searchButton.textContent = buttonText;
+        
+        
+        console.log('按钮文案Settings:', {
+            当前语言: chrome.i18n.getUILanguage(),
+            文案: buttonText
+        });
     }
 });
 
@@ -3811,21 +3818,23 @@ function showFileUploadError(message) {
 // OLLAMA SYNTHESIS MODULE
 // ============================================================
 
-// One-time migration: disable Kimi in user prefs (it's too slow). Idempotent.
+// One-time migration: disable Kimi in user prefs (it's too slow).
+// Marks itself with a flag so it never runs again — user can manually re-enable
+// Kimi from options if they want it back.
 (async function migrateDisableKimi() {
   try {
-    const flag = await chrome.storage.local.get('migration_kimi_disabled_v2');
-    if (flag.migration_kimi_disabled_v2) return;
+    const flag = await chrome.storage.local.get('migration_kimi_disabled_v1');
+    if (flag.migration_kimi_disabled_v1) return;
+
     const { sites = {} } = await chrome.storage.sync.get('sites');
-    sites.Kimi = sites.Kimi || {};
-    if (sites.Kimi.enabled !== false) {
+    if (sites.Kimi && sites.Kimi.enabled === true) {
       sites.Kimi.enabled = false;
       await chrome.storage.sync.set({ sites });
-      console.log('\u{1F916} Migration v2: Kimi forced to disabled');
+      console.log('\u{1F916} Migration: Kimi disabled (was enabled in user prefs)');
     }
-    await chrome.storage.local.set({ migration_kimi_disabled_v2: true });
+    await chrome.storage.local.set({ migration_kimi_disabled_v1: true });
   } catch (e) {
-    console.warn('Kimi migration v2 failed:', e);
+    console.warn('Kimi migration failed:', e);
   }
 })();
 
@@ -3833,7 +3842,6 @@ const OllamaSynthesizer = {
   responses: {},
   expectedSites: [],
   currentQuery: '',
-  currentMode: 'modal',
   timeoutHandle: null,
   COLLECTION_TIMEOUT: 90000,
 
@@ -3895,13 +3903,11 @@ const OllamaSynthesizer = {
     try { await chrome.storage.local.set({ ollamaPreferredModel: name }); } catch (e) {}
   },
 
-  async startCollection(query, iframes) {
+  startCollection(query, iframes) {
     this.responses = {};
     this.currentQuery = query;
     this.expectedSites = [];
     if (this.timeoutHandle) clearTimeout(this.timeoutHandle);
-
-    this.currentMode = await ollamaGetDisplayMode();
 
     iframes.forEach(iframe => {
       try {
@@ -3914,48 +3920,18 @@ const OllamaSynthesizer = {
     });
 
     if (this.expectedSites.length === 0) {
-      ollamaDispatchError(query, '\u26A0\uFE0F No hay AIs activos para sintetizar.');
+      ollamaShowModal({ query, model: null, error: '\u26A0\uFE0F No hay AIs activos para sintetizar.' });
       return;
     }
-    console.log('\u{1F916} Ollama: watching', this.expectedSites.length, 'site(s):', this.expectedSites, '\u2014 mode:', this.currentMode);
-    ollamaDispatchShowCollecting(query, this.expectedSites);
+    console.log('\u{1F916} Ollama: watching', this.expectedSites.length, 'site(s):', this.expectedSites);
+
+    // Immediate feedback: open modal in "collecting" state
+    ollamaShowCollectingModal(query, this.expectedSites);
+
     this.timeoutHandle = setTimeout(() => {
-      console.log('\u{1F916} Ollama: timeout \u2014 synthesizing with available responses');
+      console.log('\u{1F916} Ollama: timeout — synthesizing with available responses');
       this._doSynthesize();
     }, this.COLLECTION_TIMEOUT);
-  },
-
-  // Instant collection: ask each iframe to extract whatever content it has
-  // RIGHT NOW (no "stable response" wait). User clicked Sintetizar manually.
-  async startInstantCollection(query, iframes) {
-    this.responses = {};
-    this.currentQuery = query;
-    this.expectedSites = [];
-    if (this.timeoutHandle) clearTimeout(this.timeoutHandle);
-    this.currentMode = await ollamaGetDisplayMode();
-
-    iframes.forEach(iframe => {
-      try {
-        if (!iframe.src || iframe.src === 'about:blank') return;
-        const siteName = iframe.getAttribute('data-site');
-        if (!siteName) return;
-        this.expectedSites.push(siteName);
-        iframe.contentWindow.postMessage({ type: 'EXTRACT_CONTENT', siteName }, '*');
-      } catch (e) {}
-    });
-
-    if (this.expectedSites.length === 0) {
-      ollamaDispatchError(query, '\u26A0\uFE0F No hay AIs activos para sintetizar.');
-      return;
-    }
-    console.log('\u{1F916} Ollama: instant-extract from', this.expectedSites.length, 'site(s):', this.expectedSites, '\u2014 mode:', this.currentMode);
-    ollamaDispatchShowCollecting(query, this.expectedSites);
-
-    // Short grace window then synthesize with whatever arrived.
-    this.timeoutHandle = setTimeout(() => {
-      console.log('\u{1F916} Ollama: instant grace done \u2014 synthesizing with', Object.keys(this.responses).length, '/', this.expectedSites.length);
-      this._doSynthesize();
-    }, 4000);
   },
 
   receiveResponse(siteName, content, timedOut) {
@@ -3965,7 +3941,7 @@ const OllamaSynthesizer = {
     const got = Object.keys(this.responses).length;
     const total = this.expectedSites.length;
     console.log('\u{1F916} Ollama: got', siteName, got + '/' + total);
-    ollamaDispatchProgress(siteName, got, total);
+    ollamaUpdateCollectingProgress(siteName, got, total);
     if (got >= total) {
       clearTimeout(this.timeoutHandle);
       this._doSynthesize();
@@ -3975,14 +3951,14 @@ const OllamaSynthesizer = {
   async _doSynthesize() {
     const model = await this.getActiveModel();
     if (!model) {
-      ollamaDispatchError(this.currentQuery, '\u274C Ollama no disponible en localhost:11434.');
+      ollamaShowModal({ query: this.currentQuery, model: null, error: '\u274C Ollama no disponible en localhost:11434.' });
       return;
     }
-    ollamaDispatchModelInfo(this.currentQuery, model);
+    ollamaShowModal({ query: this.currentQuery, model });
 
     const siteCount = Object.keys(this.responses).length;
     if (siteCount === 0) {
-      ollamaDispatchContent('\u26A0\uFE0F No se pudo capturar ninguna respuesta de los AIs.');
+      ollamaUpdateContent('\u26A0\uFE0F No se pudo capturar ninguna respuesta de los AIs.');
       return;
     }
 
@@ -4010,7 +3986,7 @@ const OllamaSynthesizer = {
         signal: AbortSignal.timeout(180000)
       });
       if (res.status === 403) {
-        ollamaDispatchContent(
+        ollamaUpdateContent(
           '\u274C HTTP 403 — Ollama est\u00E1 bloqueando esta extensi\u00F3n por CORS.\n\n' +
           'Soluci\u00F3n (Windows PowerShell, una sola vez):\n\n' +
           '  1) Cerr\u00E1 Ollama (icono en bandeja \u2192 Quit).\n' +
@@ -4042,7 +4018,7 @@ const OllamaSynthesizer = {
             '  \u2022 El modelo "' + model + '" no acepta /api/generate (probar /api/chat).\n' +
             '  \u2022 Modelo corrupto \u2014 prob\u00E1: ollama pull ' + model;
         }
-        ollamaDispatchContent('\u274C Ollama error HTTP ' + res.status + '\n\nDetalle del servidor:\n' + (detail || '(sin cuerpo)') + hint);
+        ollamaUpdateContent('\u274C Ollama error HTTP ' + res.status + '\n\nDetalle del servidor:\n' + (detail || '(sin cuerpo)') + hint);
         return;
       }
       const reader = res.body.getReader();
@@ -4056,145 +4032,15 @@ const OllamaSynthesizer = {
           if (!line.trim()) continue;
           try {
             const json = JSON.parse(line);
-            if (json.response) { fullText += json.response; ollamaDispatchContent(fullText); }
+            if (json.response) { fullText += json.response; ollamaUpdateContent(fullText); }
           } catch {}
         }
       }
     } catch (err) {
-      ollamaDispatchContent('\u274C Error al llamar a Ollama: ' + err.message);
+      ollamaUpdateContent('\u274C Error al llamar a Ollama: ' + err.message);
     }
   }
 };
-
-// ============================================================
-// OLLAMA DISPLAY MODE — modal vs N+1 panel
-// ============================================================
-async function ollamaGetDisplayMode() {
-  try {
-    const { ollama_display_mode } = await chrome.storage.local.get('ollama_display_mode');
-    return (ollama_display_mode === 'panel') ? 'panel' : 'modal';
-  } catch (e) {
-    return 'modal';
-  }
-}
-async function ollamaSetDisplayMode(mode) {
-  const next = (mode === 'panel') ? 'panel' : 'modal';
-  try { await chrome.storage.local.set({ ollama_display_mode: next }); } catch (e) {}
-  return next;
-}
-
-// Dispatchers route every UI update to modal- or panel-flavored helpers.
-function ollamaDispatchShowCollecting(query, expectedSites) {
-  if (OllamaSynthesizer.currentMode === 'panel') ollamaShowCollectingPanel(query, expectedSites);
-  else ollamaShowCollectingModal(query, expectedSites);
-}
-function ollamaDispatchProgress(siteName, got, total) {
-  if (OllamaSynthesizer.currentMode === 'panel') ollamaUpdateCollectingProgressPanel(siteName, got, total);
-  else ollamaUpdateCollectingProgress(siteName, got, total);
-}
-function ollamaDispatchContent(text) {
-  if (OllamaSynthesizer.currentMode === 'panel') ollamaUpdateContentPanel(text);
-  else ollamaUpdateContent(text);
-}
-function ollamaDispatchError(query, errorText) {
-  if (OllamaSynthesizer.currentMode === 'panel') ollamaShowErrorPanel(query, errorText);
-  else ollamaShowModal({ query, model: null, error: errorText });
-}
-function ollamaDispatchModelInfo(query, model) {
-  if (OllamaSynthesizer.currentMode === 'panel') ollamaSetPanelModelInfo(query, model);
-  else ollamaShowModal({ query, model });
-}
-
-// ============================================================
-// Markdown renderer for synthesis output (escapes HTML, then applies subset).
-// ============================================================
-function ollamaEscapeHtml(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function ollamaRenderMarkdown(src) {
-  if (!src) return '';
-  const fences = [];
-  let s = String(src).replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (m, lang, code) => {
-    const idx = fences.push({ lang, code }) - 1;
-    return '\u0000FENCE' + idx + '\u0000';
-  });
-  s = ollamaEscapeHtml(s);
-  s = s.replace(/^######\s+(.*)$/gm, '<h6>$1</h6>');
-  s = s.replace(/^#####\s+(.*)$/gm, '<h5>$1</h5>');
-  s = s.replace(/^####\s+(.*)$/gm, '<h4>$1</h4>');
-  s = s.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>');
-  s = s.replace(/^##\s+(.*)$/gm, '<h2>$1</h2>');
-  s = s.replace(/^#\s+(.*)$/gm, '<h1>$1</h1>');
-  s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
-  s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
-  s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
-  s = s.replace(/^&gt;\s?(.*)$/gm, '<blockquote>$1</blockquote>');
-  s = s.replace(/(^(?:[-*]\s+.+\n?)+)/gm, (block) => {
-    const items = block.trim().split(/\n/).map(l => l.replace(/^[-*]\s+/, '')).map(t => '<li>' + t + '</li>').join('');
-    return '<ul>' + items + '</ul>\n';
-  });
-  s = s.replace(/(^(?:\d+\.\s+.+\n?)+)/gm, (block) => {
-    const items = block.trim().split(/\n/).map(l => l.replace(/^\d+\.\s+/, '')).map(t => '<li>' + t + '</li>').join('');
-    return '<ol>' + items + '</ol>\n';
-  });
-  s = s.replace(/^---+$/gm, '<hr>');
-  s = s.split(/\n{2,}/).map(block => {
-    const trimmed = block.trim();
-    if (!trimmed) return '';
-    if (/^<(h[1-6]|ul|ol|li|blockquote|pre|hr|p|table)/i.test(trimmed)) return trimmed;
-    if (/^\u0000FENCE\d+\u0000$/.test(trimmed)) return trimmed;
-    return '<p>' + trimmed.replace(/\n/g, '<br>') + '</p>';
-  }).join('\n');
-  s = s.replace(/\u0000FENCE(\d+)\u0000/g, (m, idx) => {
-    const f = fences[Number(idx)];
-    const langClass = f.lang ? ' class="lang-' + ollamaEscapeHtml(f.lang) + '"' : '';
-    return '<pre><code' + langClass + '>' + ollamaEscapeHtml(f.code) + '</code></pre>';
-  });
-  return s;
-}
-
-function ollamaInjectMarkdownStyles() {
-  if (document.getElementById('ollama-md-styles')) return;
-  const style = document.createElement('style');
-  style.id = 'ollama-md-styles';
-  style.textContent = `
-    .ol-md, .olp-md { font-size:14px; line-height:1.7; color:#e2e8f0; }
-    .olp-md { font-size:13px; line-height:1.65; }
-    .ol-md h1, .olp-md h1 { font-size:1.4em; margin:1em 0 .5em; color:#a78bfa; }
-    .ol-md h2, .olp-md h2 { font-size:1.25em; margin:.9em 0 .45em; color:#a78bfa; }
-    .ol-md h3, .olp-md h3 { font-size:1.1em; margin:.8em 0 .4em; color:#c4b5fd; }
-    .ol-md h4, .olp-md h4, .ol-md h5, .olp-md h5, .ol-md h6, .olp-md h6 { font-size:1em; margin:.7em 0 .35em; color:#c4b5fd; }
-    .ol-md p, .olp-md p { margin:.5em 0; }
-    .ol-md ul, .olp-md ul, .ol-md ol, .olp-md ol { margin:.4em 0 .6em 1.4em; padding:0; }
-    .ol-md li, .olp-md li { margin:.2em 0; }
-    .ol-md code, .olp-md code { background:rgba(167,139,250,.15); color:#fbbf24; padding:1px 5px; border-radius:4px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.92em; }
-    .ol-md pre, .olp-md pre { background:#0f0f1e; border:1px solid rgba(167,139,250,.2); border-radius:8px; padding:10px 12px; overflow-x:auto; margin:.6em 0; }
-    .ol-md pre code, .olp-md pre code { background:none; color:#e2e8f0; padding:0; font-size:.88em; }
-    .ol-md blockquote, .olp-md blockquote { border-left:3px solid rgba(167,139,250,.5); margin:.5em 0; padding:.2em .8em; color:#94a3b8; background:rgba(167,139,250,.06); border-radius:0 6px 6px 0; }
-    .ol-md hr, .olp-md hr { border:none; border-top:1px solid rgba(255,255,255,.1); margin:.8em 0; }
-    .ol-md strong, .olp-md strong { color:#fff; }
-    .ol-md em, .olp-md em { color:#cbd5e1; }
-    .ol-md a, .olp-md a { color:#a78bfa; }
-  `;
-  document.head.appendChild(style);
-}
-
-// Panel-grid helpers: set columns based on REAL visible iframe count, not --columns.
-function ollamaApplyPanelGrid() {
-  const container = document.getElementById('iframes-container');
-  if (!container) return;
-  const iframeCount = container.querySelectorAll('iframe.ai-iframe').length;
-  const cols = Math.max(iframeCount + 1, 1);
-  container.classList.add('has-ollama-panel');
-  container.style.setProperty('grid-template-columns', 'repeat(' + cols + ', 1fr)', 'important');
-}
-function ollamaClearPanelGrid() {
-  const container = document.getElementById('iframes-container');
-  if (!container) return;
-  container.classList.remove('has-ollama-panel');
-  container.style.removeProperty('grid-template-columns');
-}
 
 function ollamaEnsureModal() {
   if (document.getElementById('ollama-synthesis-modal')) return;
@@ -4203,480 +4049,4 @@ function ollamaEnsureModal() {
     #ollama-synthesis-modal { display:none; position:fixed; inset:0; z-index:99999; }
     #ollama-overlay { position:absolute; inset:0; background:rgba(0,0,0,.72); backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; animation:ol-fadein .2s ease; }
     @keyframes ol-fadein { from{opacity:0} to{opacity:1} }
-    #ollama-dialog { background:#1a1a2e; color:#e2e8f0; border:1px solid rgba(167,139,250,.35); border-radius:18px; width:740px; max-width:93vw; max-height:82vh; display:flex; flex-direction:column; box-shadow:0 28px 72px rgba(0,0,0,.65); animation:ol-slidein .25s ease; }
-    @keyframes ol-slidein { from{transform:translateY(22px);opacity:0} to{transform:translateY(0);opacity:1} }
-    #ollama-dialog .ol-header { display:flex; align-items:center; justify-content:space-between; padding:20px 24px 14px; border-bottom:1px solid rgba(255,255,255,.07); flex-shrink:0; }
-    #ollama-dialog .ol-title-wrap { display:flex; align-items:center; gap:12px; }
-    #ollama-dialog .ol-icon { font-size:30px; line-height:1; }
-    #ollama-dialog .ol-title { font-size:18px; font-weight:700; color:#a78bfa; }
-    #ollama-dialog .ol-model { font-size:11px; color:#475569; margin-top:3px; }
-    #ollama-dialog .ol-model-row { display:flex; align-items:center; gap:8px; margin-top:4px; }
-    #ollama-dialog .ol-model-label { font-size:11px; color:#94a3b8; }
-    #ollama-dialog .ol-model-select { background:#0f0f1e; color:#e2e8f0; border:1px solid rgba(167,139,250,.35); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer; max-width:240px; }
-    #ollama-dialog .ol-model-select:hover { border-color:#a78bfa; }
-    #ollama-dialog .ol-retry-btn { background:rgba(167,139,250,.15); color:#a78bfa; border:1px solid rgba(167,139,250,.35); border-radius:6px; padding:3px 10px; font-size:11px; cursor:pointer; transition:.15s; }
-    #ollama-dialog .ol-retry-btn:hover { background:rgba(167,139,250,.25); color:#fff; }
-    #ollama-dialog .ol-close { background:none; border:none; color:#475569; font-size:18px; cursor:pointer; padding:4px 8px; border-radius:7px; transition:.15s; }
-    #ollama-dialog .ol-close:hover { background:rgba(255,255,255,.08); color:#e2e8f0; }
-    #ollama-dialog .ol-query { padding:9px 24px; font-size:12px; color:#64748b; font-style:italic; border-bottom:1px solid rgba(255,255,255,.05); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0; }
-    #ollama-dialog .ol-body { flex:1; overflow-y:auto; padding:20px 24px; scrollbar-width:thin; scrollbar-color:rgba(167,139,250,.3) transparent; }
-    #ollama-dialog .ol-loading { display:flex; align-items:center; gap:12px; color:#94a3b8; padding:16px 0; }
-    #ollama-dialog .ol-spinner { width:20px; height:20px; border:2px solid rgba(167,139,250,.3); border-top-color:#a78bfa; border-radius:50%; animation:ol-spin .8s linear infinite; flex-shrink:0; }
-    @keyframes ol-spin { to{transform:rotate(360deg)} }
-    #ollama-dialog .ol-content { display:none; font-size:14px; line-height:1.75; color:#e2e8f0; white-space:pre-wrap; word-break:break-word; }
-    #ollama-dialog .ol-sites-label { font-size:11px; color:#475569; margin-bottom:14px; }
-  `;
-  document.head.appendChild(style);
-  const modal = document.createElement('div');
-  modal.id = 'ollama-synthesis-modal';
-  modal.innerHTML =
-    '<div id="ollama-overlay"><div id="ollama-dialog">' +
-      '<div class="ol-header">' +
-        '<div class="ol-title-wrap">' +
-          '<span class="ol-icon">&#x1F9E0;</span>' +
-          '<div>' +
-            '<div class="ol-title">S\u00EDntesis Final \u00B7 Ollama</div>' +
-            '<div class="ol-model" id="ol-model-label"></div>' +
-            '<div class="ol-model-row">' +
-              '<span class="ol-model-label">Modelo:</span>' +
-              '<select class="ol-model-select" id="ol-model-select"><option>cargando...</option></select>' +
-              '<button class="ol-retry-btn" id="ol-retry-btn" title="Reintentar con el modelo seleccionado">\u21BB Reintentar</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-        '<button class="ol-close" id="ol-close-btn">\u2715</button>' +
-      '</div>' +
-      '<div class="ol-query" id="ol-query-label"></div>' +
-      '<div class="ol-body">' +
-        '<div class="ol-sites-label" id="ol-sites-label"></div>' +
-        '<div class="ol-loading" id="ol-loading"><div class="ol-spinner"></div><span>Sintetizando respuestas...</span></div>' +
-        '<div class="ol-content" id="ol-content"></div>' +
-      '</div>' +
-    '</div></div>';
-  document.body.appendChild(modal);
-  document.getElementById('ol-close-btn').addEventListener('click', () => { modal.style.display = 'none'; });
-  document.getElementById('ollama-overlay').addEventListener('click', e => { if (e.target.id === 'ollama-overlay') modal.style.display = 'none'; });
-
-  // When user picks a different model, persist and retry synthesis
-  document.getElementById('ol-model-select').addEventListener('change', async (e) => {
-    await OllamaSynthesizer.setPreferredModel(e.target.value);
-    console.log('\u{1F916} Ollama: model preference saved =', e.target.value);
-  });
-  document.getElementById('ol-retry-btn').addEventListener('click', async () => {
-    const sel = document.getElementById('ol-model-select');
-    if (sel && sel.value) await OllamaSynthesizer.setPreferredModel(sel.value);
-    // Re-run synthesis with same query, fresh AIs
-    const q = OllamaSynthesizer.currentQuery;
-    if (!q) return;
-    const allIframes = document.querySelectorAll('iframe.ai-iframe');
-    OllamaSynthesizer.startCollection(q, allIframes);
-  });
-
-  // Populate dropdown on first open
-  ollamaPopulateModelDropdown();
-}
-
-async function ollamaPopulateModelDropdown() {
-  const sel = document.getElementById('ol-model-select');
-  if (!sel) return;
-  const models = await OllamaSynthesizer.listAvailableModels();
-  let pinned = null;
-  try {
-    const stored = await chrome.storage.local.get('ollamaPreferredModel');
-    pinned = stored.ollamaPreferredModel || null;
-  } catch (e) {}
-  if (models.length === 0) {
-    sel.innerHTML = '<option value="">(no se detectaron modelos)</option>';
-    return;
-  }
-  sel.innerHTML = models.map(name => {
-    const selAttr = (pinned && name === pinned) ? ' selected' : '';
-    return '<option value="' + name + '"' + selAttr + '>' + name + '</option>';
-  }).join('');
-}
-
-function ollamaShowModal({ query, model, error }) {
-  ollamaEnsureModal();
-  const modal = document.getElementById('ollama-synthesis-modal');
-  modal.style.display = 'block';
-  document.getElementById('ol-query-label').textContent = '"' + query + '"';
-  document.getElementById('ol-model-label').textContent = model ? 'Modelo: ' + model : '';
-  const siteNames = Object.keys(OllamaSynthesizer.responses);
-  document.getElementById('ol-sites-label').textContent = siteNames.length > 0 ? 'Integrando: ' + siteNames.join(', ') : '';
-  document.getElementById('ol-loading').style.display = error ? 'none' : 'flex';
-  const content = document.getElementById('ol-content');
-  content.style.display = error ? 'block' : 'none';
-  if (error) content.textContent = error;
-}
-
-function ollamaUpdateContent(text) {
-  ollamaEnsureModal();
-  ollamaInjectMarkdownStyles();
-  const loading = document.getElementById('ol-loading');
-  const content = document.getElementById('ol-content');
-  if (loading) loading.style.display = 'none';
-  if (content) {
-    content.style.display = 'block';
-    content.classList.add('ol-md');
-    content.innerHTML = ollamaRenderMarkdown(text);
-    content.parentElement.scrollTop = content.parentElement.scrollHeight;
-  }
-}
-
-// Open modal in "collecting" state — immediate feedback while we wait for AIs
-function ollamaShowCollectingModal(query, expectedSites) {
-  ollamaEnsureModal();
-  ollamaPopulateModelDropdown(); // refresh model list every time
-  const modal = document.getElementById('ollama-synthesis-modal');
-  modal.style.display = 'block';
-  document.getElementById('ol-query-label').textContent = '"' + query + '"';
-  document.getElementById('ol-model-label').textContent = 'Esperando respuestas de los AIs...';
-  document.getElementById('ol-sites-label').innerHTML =
-    'Recolectando <span id="ol-progress-count">0</span>/' + expectedSites.length + ' \u00B7 ' +
-    expectedSites.map(s => '<span class="ol-site-pill" data-site="' + s + '">\u23F3 ' + s + '</span>').join(' ');
-  // Inject pill styles once
-  if (!document.getElementById('ol-pill-styles')) {
-    const style = document.createElement('style');
-    style.id = 'ol-pill-styles';
-    style.textContent =
-      '.ol-site-pill { display:inline-block; padding:2px 8px; margin:2px 4px 2px 0; border-radius:10px; background:rgba(167,139,250,.12); color:#a78bfa; font-size:11px; transition:all .2s; }' +
-      '.ol-site-pill.done { background:rgba(34,197,94,.15); color:#22c55e; }' +
-      '.ol-site-pill.timeout { background:rgba(239,68,68,.15); color:#ef4444; }';
-    document.head.appendChild(style);
-  }
-  const loading = document.getElementById('ol-loading');
-  const content = document.getElementById('ol-content');
-  if (loading) {
-    loading.style.display = 'flex';
-    loading.querySelector('span').textContent = 'Esperando que los AIs terminen de responder...';
-  }
-  if (content) {
-    content.style.display = 'none';
-    content.textContent = '';
-  }
-}
-
-// Update progress as each AI's response arrives
-function ollamaUpdateCollectingProgress(siteName, got, total) {
-  const counter = document.getElementById('ol-progress-count');
-  if (counter) counter.textContent = got;
-  const pill = document.querySelector('.ol-site-pill[data-site="' + siteName + '"]');
-  if (pill) {
-    pill.classList.add('done');
-    pill.textContent = '\u2713 ' + siteName;
-  }
-  if (got >= total) {
-    const loading = document.getElementById('ol-loading');
-    if (loading) loading.querySelector('span').textContent = 'Sintetizando con Ollama...';
-    document.getElementById('ol-model-label').textContent = 'Recolecci\u00F3n completa \u00B7 sintetizando...';
-  }
-}
-
-window.addEventListener('message', event => {
-  if (event.data && event.data.type === 'RESPONSE_COMPLETE') {
-    OllamaSynthesizer.receiveResponse(event.data.siteName, event.data.content, event.data.timedOut);
-  } else if (event.data && event.data.type === 'EXTRACTED_CONTENT') {
-    OllamaSynthesizer.receiveResponse(event.data.siteName, event.data.content, false);
-  }
-});
-
-// Eager-load button CSS (independent of modal)
-function ollamaInjectButtonStyles() {
-  if (document.getElementById('ollama-synth-btn-styles')) return;
-  const style = document.createElement('style');
-  style.id = 'ollama-synth-btn-styles';
-  style.textContent = `
-    @keyframes ol-spin-btn { to { transform: rotate(360deg); } }
-    .ollama-synth-btn { display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg,#7c3aed 0%,#a78bfa 100%); color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:13px; font-weight:600; cursor:pointer; transition:all .15s ease; box-shadow:0 2px 6px rgba(124,58,237,.3); margin-left:8px; height:36px; }
-    .ollama-synth-btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(124,58,237,.45); }
-    .ollama-synth-btn:active { transform:translateY(0); box-shadow:0 1px 3px rgba(124,58,237,.3); }
-    .ollama-synth-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
-    .ollama-synth-btn .ollama-synth-icon { font-size:16px; line-height:1; }
-    .ollama-synth-btn .ollama-synth-label { white-space:nowrap; }
-    .ollama-synth-btn.is-running { background:linear-gradient(135deg,#475569 0%,#64748b 100%); pointer-events:none; }
-    .ollama-synth-btn.is-running .ollama-synth-icon { animation: ol-spin-btn 1.2s linear infinite; display:inline-block; }
-  `;
-  document.head.appendChild(style);
-}
-
-// Manual synth button — fires a re-synthesis on demand
-function ollamaWireSynthButton() {
-  ollamaInjectButtonStyles();
-  ollamaInjectPanelStyles();
-  ollamaWireModeToggle();
-  const btn = document.getElementById('ollamaSynthBtn');
-  if (!btn || btn.dataset.wired === '1') return;
-  btn.dataset.wired = '1';
-  btn.addEventListener('click', async () => {
-    const searchInput = document.getElementById('searchInput');
-    const lastQuery = (OllamaSynthesizer.currentQuery || (searchInput && searchInput.value) || '').trim();
-    OllamaSynthesizer.currentMode = await ollamaGetDisplayMode();
-    if (!lastQuery) {
-      ollamaDispatchError('(sin consulta)', '\u26A0\uFE0F Hac\u00E9 una consulta primero antes de sintetizar.');
-      return;
-    }
-    const allIframes = document.querySelectorAll('iframe.ai-iframe');
-    if (allIframes.length === 0) {
-      ollamaDispatchError(lastQuery, '\u26A0\uFE0F No hay AIs activos para sintetizar.');
-      return;
-    }
-    btn.classList.add('is-running');
-    // Manual = instant: don't wait for "stable response" detection.
-    OllamaSynthesizer.startInstantCollection(lastQuery, allIframes);
-    const releaseTimer = setInterval(() => {
-      const modal = document.getElementById('ollama-synthesis-modal');
-      const panel = document.getElementById('ollama-synthesis-panel');
-      const modalGone = !modal || modal.style.display === 'none';
-      const panelGone = !panel || panel.style.display === 'none';
-      if (modalGone && panelGone) {
-        btn.classList.remove('is-running');
-        clearInterval(releaseTimer);
-      }
-    }, 500);
-    setTimeout(() => {
-      btn.classList.remove('is-running');
-      clearInterval(releaseTimer);
-    }, OllamaSynthesizer.COLLECTION_TIMEOUT + 5000);
-  });
-}
-
-// Mode toggle button (next to Sintetizar) — switches modal <-> panel.
-async function ollamaWireModeToggle() {
-  const toggle = document.getElementById('ollamaModeToggle');
-  if (!toggle || toggle.dataset.wired === '1') return;
-  toggle.dataset.wired = '1';
-  if (!document.getElementById('ollama-mode-toggle-styles')) {
-    const style = document.createElement('style');
-    style.id = 'ollama-mode-toggle-styles';
-    style.textContent = `
-      .ollama-synth-group { display:inline-flex; align-items:center; gap:0; }
-      .ollama-mode-toggle { display:inline-flex; align-items:center; justify-content:center; background:rgba(167,139,250,.12); color:#a78bfa; border:1px solid rgba(167,139,250,.35); border-radius:8px; padding:6px 10px; font-size:14px; cursor:pointer; transition:all .15s ease; height:36px; margin-left:4px; }
-      .ollama-mode-toggle:hover { background:rgba(167,139,250,.22); color:#fff; }
-      .ollama-mode-toggle.is-panel { background:rgba(34,197,94,.18); color:#22c55e; border-color:rgba(34,197,94,.45); }
-      .ollama-mode-icon { font-size:16px; line-height:1; }
-    `;
-    document.head.appendChild(style);
-  }
-  const refreshIcon = async () => {
-    const mode = await ollamaGetDisplayMode();
-    const icon = document.getElementById('ollamaModeIcon');
-    if (icon) icon.innerHTML = (mode === 'panel') ? '&#x25A6;' : '&#x25A1;';
-    toggle.classList.toggle('is-panel', mode === 'panel');
-    toggle.title = (mode === 'panel') ? 'Modo: Panel N+1 (clic para cambiar a Modal)' : 'Modo: Modal (clic para cambiar a Panel N+1)';
-  };
-  await refreshIcon();
-  toggle.addEventListener('click', async () => {
-    const current = await ollamaGetDisplayMode();
-    const next = (current === 'panel') ? 'modal' : 'panel';
-    await ollamaSetDisplayMode(next);
-    await refreshIcon();
-  });
-}
-
-// ============================================================
-// OLLAMA PANEL MODE — render synthesis as an extra (N+1) column.
-// ============================================================
-function ollamaInjectPanelStyles() {
-  if (document.getElementById('ollama-panel-styles')) return;
-  const style = document.createElement('style');
-  style.id = 'ollama-panel-styles';
-  style.textContent = `
-    /* Panel-mode grid columns are set via inline style based on real iframe count. */
-    #ollama-synthesis-panel { display:none; flex-direction:column; min-width:0; height:calc(100vh - 60px); background:#1a1a2e; color:#e2e8f0; border:1px solid rgba(167,139,250,.35); border-radius:12px; box-shadow:0 6px 24px rgba(0,0,0,.45); overflow:hidden; box-sizing:border-box; }
-    #ollama-synthesis-panel .olp-header { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.07); background:rgba(167,139,250,.08); }
-    #ollama-synthesis-panel .olp-title-wrap { display:flex; align-items:center; gap:8px; min-width:0; }
-    #ollama-synthesis-panel .olp-icon { font-size:20px; line-height:1; flex-shrink:0; }
-    #ollama-synthesis-panel .olp-title { font-size:14px; font-weight:700; color:#a78bfa; }
-    #ollama-synthesis-panel .olp-close { background:none; border:none; color:#94a3b8; font-size:16px; cursor:pointer; padding:2px 8px; border-radius:6px; transition:.15s; flex-shrink:0; }
-    #ollama-synthesis-panel .olp-close:hover { background:rgba(255,255,255,.08); color:#fff; }
-    #ollama-synthesis-panel .olp-meta { padding:6px 12px; border-bottom:1px solid rgba(255,255,255,.05); font-size:11px; color:#64748b; }
-    #ollama-synthesis-panel .olp-meta-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:4px; }
-    #ollama-synthesis-panel .olp-meta-label { color:#94a3b8; }
-    #ollama-synthesis-panel .olp-model-select { background:#0f0f1e; color:#e2e8f0; border:1px solid rgba(167,139,250,.35); border-radius:5px; padding:2px 6px; font-size:11px; cursor:pointer; max-width:160px; }
-    #ollama-synthesis-panel .olp-retry-btn { background:rgba(167,139,250,.15); color:#a78bfa; border:1px solid rgba(167,139,250,.35); border-radius:5px; padding:2px 8px; font-size:11px; cursor:pointer; }
-    #ollama-synthesis-panel .olp-retry-btn:hover { background:rgba(167,139,250,.25); color:#fff; }
-    #ollama-synthesis-panel .olp-query { padding:6px 12px; font-size:11px; font-style:italic; color:#64748b; border-bottom:1px solid rgba(255,255,255,.05); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    #ollama-synthesis-panel .olp-body { flex:1; overflow-y:auto; padding:12px; scrollbar-width:thin; scrollbar-color:rgba(167,139,250,.3) transparent; }
-    #ollama-synthesis-panel .olp-loading { display:flex; align-items:center; gap:10px; color:#94a3b8; padding:8px 0; font-size:12px; }
-    #ollama-synthesis-panel .olp-spinner { width:16px; height:16px; border:2px solid rgba(167,139,250,.3); border-top-color:#a78bfa; border-radius:50%; animation:olp-spin .8s linear infinite; flex-shrink:0; }
-    @keyframes olp-spin { to{transform:rotate(360deg)} }
-    #ollama-synthesis-panel .olp-content { display:none; font-size:13px; line-height:1.65; color:#e2e8f0; white-space:pre-wrap; word-break:break-word; }
-    #ollama-synthesis-panel .olp-sites-label { font-size:11px; color:#475569; margin-bottom:10px; }
-    .olp-site-pill { display:inline-block; padding:2px 7px; margin:2px 3px 2px 0; border-radius:9px; background:rgba(167,139,250,.12); color:#a78bfa; font-size:10px; transition:all .2s; }
-    .olp-site-pill.done { background:rgba(34,197,94,.15); color:#22c55e; }
-    .olp-site-pill.timeout { background:rgba(239,68,68,.15); color:#ef4444; }
-  `;
-  document.head.appendChild(style);
-}
-
-function ollamaEnsurePanel() {
-  let panel = document.getElementById('ollama-synthesis-panel');
-  if (panel) return panel;
-  ollamaInjectPanelStyles();
-  const container = document.getElementById('iframes-container');
-  if (!container) return null;
-  panel = document.createElement('div');
-  panel.id = 'ollama-synthesis-panel';
-  panel.className = 'ai-iframe-panel';
-  panel.innerHTML =
-    '<div class="olp-header">' +
-      '<div class="olp-title-wrap">' +
-        '<span class="olp-icon">&#x1F9E0;</span>' +
-        '<span class="olp-title">S\u00EDntesis Ollama</span>' +
-      '</div>' +
-      '<button class="olp-close" id="olp-close-btn" title="Cerrar panel">\u2715</button>' +
-    '</div>' +
-    '<div class="olp-meta">' +
-      '<div id="olp-model-label">Esperando respuestas de los AIs...</div>' +
-      '<div class="olp-meta-row">' +
-        '<span class="olp-meta-label">Modelo:</span>' +
-        '<select class="olp-model-select" id="olp-model-select"><option>cargando...</option></select>' +
-        '<button class="olp-retry-btn" id="olp-retry-btn" title="Reintentar">\u21BB</button>' +
-      '</div>' +
-    '</div>' +
-    '<div class="olp-query" id="olp-query-label"></div>' +
-    '<div class="olp-body">' +
-      '<div class="olp-sites-label" id="olp-sites-label"></div>' +
-      '<div class="olp-loading" id="olp-loading"><div class="olp-spinner"></div><span>Esperando que los AIs terminen de responder...</span></div>' +
-      '<div class="olp-content" id="olp-content"></div>' +
-    '</div>';
-  container.appendChild(panel);
-  const closeBtn = panel.querySelector('#olp-close-btn');
-  if (closeBtn) closeBtn.addEventListener('click', () => {
-    panel.style.display = 'none';
-    ollamaClearPanelGrid();
-  });
-  const select = panel.querySelector('#olp-model-select');
-  if (select) select.addEventListener('change', async (e) => {
-    await OllamaSynthesizer.setPreferredModel(e.target.value);
-  });
-  const retryBtn = panel.querySelector('#olp-retry-btn');
-  if (retryBtn) retryBtn.addEventListener('click', async () => {
-    const sel = panel.querySelector('#olp-model-select');
-    if (sel && sel.value) await OllamaSynthesizer.setPreferredModel(sel.value);
-    if (Object.keys(OllamaSynthesizer.responses).length > 0) {
-      OllamaSynthesizer._doSynthesize();
-    } else {
-      const allIframes = document.querySelectorAll('iframe.ai-iframe');
-      if (allIframes.length > 0 && OllamaSynthesizer.currentQuery) {
-        OllamaSynthesizer.startInstantCollection(OllamaSynthesizer.currentQuery, allIframes);
-      }
-    }
-  });
-  return panel;
-}
-
-async function ollamaPopulatePanelModelDropdown() {
-  const select = document.getElementById('olp-model-select');
-  if (!select) return;
-  const models = await OllamaSynthesizer.listAvailableModels();
-  if (!models || models.length === 0) {
-    select.innerHTML = '<option value="">(ninguno)</option>';
-    return;
-  }
-  const active = await OllamaSynthesizer.getActiveModel();
-  select.innerHTML = models.map(m => '<option value="' + m.name + '"' + (m.name === active ? ' selected' : '') + '>' + m.name + '</option>').join('');
-}
-
-function ollamaShowCollectingPanel(query, expectedSites) {
-  const panel = ollamaEnsurePanel();
-  if (!panel) return;
-  ollamaPopulatePanelModelDropdown();
-  panel.style.display = 'flex';
-  ollamaApplyPanelGrid();
-  const q = document.getElementById('olp-query-label');
-  if (q) q.textContent = '"' + query + '"';
-  const ml = document.getElementById('olp-model-label');
-  if (ml) ml.textContent = 'Esperando respuestas de los AIs...';
-  const sites = document.getElementById('olp-sites-label');
-  if (sites) sites.innerHTML = 'Recolectando <span id="olp-progress-count">0</span>/' + expectedSites.length + ' \u00B7 ' + expectedSites.map(s => '<span class="olp-site-pill" data-site="' + s + '">\u23F3 ' + s + '</span>').join(' ');
-  const loading = document.getElementById('olp-loading');
-  const content = document.getElementById('olp-content');
-  if (loading) {
-    loading.style.display = 'flex';
-    const sp = loading.querySelector('span');
-    if (sp) sp.textContent = 'Esperando que los AIs terminen de responder...';
-  }
-  if (content) {
-    content.style.display = 'none';
-    content.textContent = '';
-  }
-}
-
-function ollamaUpdateCollectingProgressPanel(siteName, got, total) {
-  const counter = document.getElementById('olp-progress-count');
-  if (counter) counter.textContent = got;
-  const pill = document.querySelector('.olp-site-pill[data-site="' + siteName + '"]');
-  if (pill) {
-    pill.classList.add('done');
-    pill.textContent = '\u2713 ' + siteName;
-  }
-  if (got >= total) {
-    const loading = document.getElementById('olp-loading');
-    if (loading) {
-      const sp = loading.querySelector('span');
-      if (sp) sp.textContent = 'Sintetizando con Ollama...';
-    }
-    const ml = document.getElementById('olp-model-label');
-    if (ml) ml.textContent = 'Recolecci\u00F3n completa \u00B7 sintetizando...';
-  }
-}
-
-function ollamaUpdateContentPanel(text) {
-  ollamaInjectMarkdownStyles();
-  const panel = ollamaEnsurePanel();
-  if (!panel) return;
-  panel.style.display = 'flex';
-  ollamaApplyPanelGrid();
-  const loading = document.getElementById('olp-loading');
-  const content = document.getElementById('olp-content');
-  if (loading) loading.style.display = 'none';
-  if (content) {
-    content.style.display = 'block';
-    content.classList.add('olp-md');
-    content.innerHTML = ollamaRenderMarkdown(text);
-  }
-}
-
-function ollamaSetPanelModelInfo(query, model) {
-  const panel = ollamaEnsurePanel();
-  if (!panel) return;
-  panel.style.display = 'flex';
-  ollamaApplyPanelGrid();
-  const q = document.getElementById('olp-query-label');
-  if (q) q.textContent = '"' + query + '"';
-  const ml = document.getElementById('olp-model-label');
-  if (ml) ml.textContent = model ? ('Modelo: ' + model) : '';
-  const loading = document.getElementById('olp-loading');
-  if (loading) {
-    const sp = loading.querySelector('span');
-    if (sp) sp.textContent = 'Sintetizando con Ollama...';
-  }
-  ollamaPopulatePanelModelDropdown();
-}
-
-function ollamaShowErrorPanel(query, errorText) {
-  const panel = ollamaEnsurePanel();
-  if (!panel) return;
-  panel.style.display = 'flex';
-  ollamaApplyPanelGrid();
-  const q = document.getElementById('olp-query-label');
-  if (q) q.textContent = '"' + (query || '') + '"';
-  const ml = document.getElementById('olp-model-label');
-  if (ml) ml.textContent = '';
-  const loading = document.getElementById('olp-loading');
-  const content = document.getElementById('olp-content');
-  if (loading) loading.style.display = 'none';
-  if (content) {
-    content.style.display = 'block';
-    content.textContent = errorText || '';
-  }
-  ollamaPopulatePanelModelDropdown();
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', ollamaWireSynthButton);
-} else {
-  ollamaWireSynthButton();
-}
-// END OLLAMA SYNTHESIS MODULE
+    #ollama-dialog { background:#1a1a2e; color:#e2e8f

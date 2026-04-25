@@ -19,6 +19,15 @@
 - **Favorite query**: Star the current query to save it to Favorites.
 - **Site selection**: Choose which AI sites to load and save as default (collection mode settings).
 
+#### 2. AI Synthesis with Ollama (Local AI)
+
+- **Integrated Synthesis Panel**: A new dedicated panel that appears alongside AI iframes to synthesize multiple responses into one comprehensive answer using local models via Ollama.
+- **Real-time Progress Tracking**: Visual progress indicators (pills) show exactly which AIs have finished responding and which are still pending.
+- **Markdown Support**: The synthesized response is rendered with rich Markdown formatting for better readability.
+- **Model Selection & Control**: Easily switch between local models directly from the panel and re-trigger synthesis as needed.
+- **Privacy-First**: Your synthesis happens locally on your machine using Ollama, keeping your data private.
+
+
 #### 2. Side panel / Homepage
 
 - **Open**: Click the extension icon or press **⌘+M** (Mac) / **Ctrl+M** (Windows).
