@@ -1442,7 +1442,7 @@ window.addEventListener('message', async function(event) {
     }
     
     
-    const validMultiAITypes = ['TRIGGER_PASTE', 'search', 'EXTRACT_CONTENT', 'SET_HISTORY_CONTEXT', 'GET_CURRENT_URL'];
+    const validMultiAITypes = ['TRIGGER_PASTE', 'search', 'EXTRACT_CONTENT', 'SET_HISTORY_CONTEXT', 'GET_CURRENT_URL', 'WATCH_FOR_RESPONSE'];
     
     if (!validMultiAITypes.includes(event.data.type)) {
         return;
@@ -1700,6 +1700,7 @@ window.addEventListener('message', async function(event) {
         return;
     }
     // ── End Ollama watch ───────────────────────────────────────────────────
+
 
     if (event.data.type !== 'TRIGGER_PASTE' && !event.data.query) {
         return;

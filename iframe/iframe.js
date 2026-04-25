@@ -980,7 +980,7 @@ async function createIframes(query, sites) {
             text-decoration:none;font-size:14px;font-weight:500;
             transition:background 0.2s;
           " onmouseover="this.style.background='#6d28d9'" onmouseout="this.style.background='#7c3aed'">
-            Abrir en Perplexity ↗
+            Abrir en ${site.name} ↗
           </a>
         `;
 
@@ -2157,11 +2157,7 @@ function shanshuo() {
 
 
 async function iframeFresh(query) {
-      // Kick off Ollama collection right away (will watch iframes after load)
-      setTimeout(() => {
-        const allIframes = document.querySelectorAll('iframe.ai-iframe');
-        OllamaSynthesizer.startCollection(query, allIframes);
-      }, 500); // small delay so iframes are refreshed before we start watching
+      // Note: Ollama synthesis is now manual-only — fired by the toolbar button.
 
       let historyId = null;
       try {
@@ -3827,22 +3823,10 @@ const OllamaSynthesizer = {
   expectedSites: [],
   currentQuery: '',
   timeoutHandle: null,
-  COLLECTION_TIMEOUT: 90000, // 90s max wait for all responses
+  COLLECTION_TIMEOUT: 90000,
 
-  async getActiveModel() {
-    // Try /api/ps first (currently loaded models)
-    try {
-      const res = await fetch('http://localhost:11434/api/ps', {
-        signal: AbortSignal.timeout(3000)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const models = data.models || [];
-        if (models.length > 0) return models[0].name;
-      }
-    } catch (e) { /* not loaded, fall through */ }
-
-    // Fallback: list all available models
+  // List ALL available models (local + cloud) sorted by modified_at desc
+  async listAvailableModels() {
     try {
       const res = await fetch('http://localhost:11434/api/tags', {
         signal: AbortSignal.timeout(3000)
@@ -3850,56 +3834,95 @@ const OllamaSynthesizer = {
       if (res.ok) {
         const data = await res.json();
         const models = data.models || [];
+        models.sort((a, b) => {
+          const ta = a.modified_at ? new Date(a.modified_at).getTime() : 0;
+          const tb = b.modified_at ? new Date(b.modified_at).getTime() : 0;
+          return tb - ta;
+        });
+        return models.map(m => m.name);
+      }
+    } catch (e) { console.warn('Ollama /api/tags failed:', e); }
+    return [];
+  },
+
+  // Get user's preferred model (chrome.storage), fallback to running/recent
+  async getActiveModel() {
+    // User-pinned preference wins
+    try {
+      const stored = await chrome.storage.local.get('ollamaPreferredModel');
+      if (stored.ollamaPreferredModel) {
+        console.log('\u{1F916} Ollama: using pinned model', stored.ollamaPreferredModel);
+        return stored.ollamaPreferredModel;
+      }
+    } catch (e) {}
+
+    // Otherwise prefer locally-loaded model from /api/ps
+    try {
+      const res = await fetch('http://localhost:11434/api/ps', {
+        signal: AbortSignal.timeout(3000)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const models = data.models || [];
+        console.log('\u{1F916} Ollama /api/ps returned:', models.map(m => m.name));
         if (models.length > 0) return models[0].name;
       }
-    } catch (e) { /* ollama not running */ }
+    } catch (e) { console.warn('Ollama /api/ps failed:', e); }
 
+    // Last resort: most recently modified from /api/tags
+    const all = await this.listAvailableModels();
+    console.log('\u{1F916} Ollama /api/tags returned:', all);
+    if (all.length > 0) {
+      console.log('\u{1F916} Ollama: picked', all[0]);
+      return all[0];
+    }
     return null;
   },
 
+  async setPreferredModel(name) {
+    try { await chrome.storage.local.set({ ollamaPreferredModel: name }); } catch (e) {}
+  },
+
   startCollection(query, iframes) {
-    // Reset state
     this.responses = {};
     this.currentQuery = query;
     this.expectedSites = [];
-
     if (this.timeoutHandle) clearTimeout(this.timeoutHandle);
 
-    // Collect only real iframes (skip URL-query cards which have no inject.js)
     iframes.forEach(iframe => {
       try {
         if (!iframe.src || iframe.src === 'about:blank') return;
         const siteName = iframe.getAttribute('data-site');
         if (!siteName) return;
-
         this.expectedSites.push(siteName);
-
-        // Send watch request — inject.js will reply with RESPONSE_COMPLETE
-        iframe.contentWindow.postMessage({
-          type: 'WATCH_FOR_RESPONSE',
-          siteName
-        }, '*');
-      } catch (e) { /* cross-origin or missing contentWindow */ }
+        iframe.contentWindow.postMessage({ type: 'WATCH_FOR_RESPONSE', siteName }, '*');
+      } catch (e) {}
     });
 
-    if (this.expectedSites.length === 0) return;
-    console.log(`🤖 Ollama: watching ${this.expectedSites.length} site(s):`, this.expectedSites);
+    if (this.expectedSites.length === 0) {
+      ollamaShowModal({ query, model: null, error: '\u26A0\uFE0F No hay AIs activos para sintetizar.' });
+      return;
+    }
+    console.log('\u{1F916} Ollama: watching', this.expectedSites.length, 'site(s):', this.expectedSites);
 
-    // Hard timeout — synthesize with whatever we have
+    // Immediate feedback: open modal in "collecting" state
+    ollamaShowCollectingModal(query, this.expectedSites);
+
     this.timeoutHandle = setTimeout(() => {
-      console.log('🤖 Ollama: collection timeout — synthesizing with available responses');
+      console.log('\u{1F916} Ollama: timeout — synthesizing with available responses');
       this._doSynthesize();
     }, this.COLLECTION_TIMEOUT);
   },
 
   receiveResponse(siteName, content, timedOut) {
     if (!this.expectedSites.includes(siteName)) return;
-    if (this.responses[siteName]) return; // already received
-
+    if (this.responses[siteName]) return;
     this.responses[siteName] = { content, timedOut };
-    console.log(`🤖 Ollama: got ${siteName} (${Object.keys(this.responses).length}/${this.expectedSites.length})`);
-
-    if (Object.keys(this.responses).length >= this.expectedSites.length) {
+    const got = Object.keys(this.responses).length;
+    const total = this.expectedSites.length;
+    console.log('\u{1F916} Ollama: got', siteName, got + '/' + total);
+    ollamaUpdateCollectingProgress(siteName, got, total);
+    if (got >= total) {
       clearTimeout(this.timeoutHandle);
       this._doSynthesize();
     }
@@ -3908,38 +3931,32 @@ const OllamaSynthesizer = {
   async _doSynthesize() {
     const model = await this.getActiveModel();
     if (!model) {
-      ollamaShowModal({
-        query: this.currentQuery,
-        model: null,
-        error: '❌ Ollama no está disponible. Verificá que esté corriendo en localhost:11434.'
-      });
+      ollamaShowModal({ query: this.currentQuery, model: null, error: '\u274C Ollama no disponible en localhost:11434.' });
       return;
     }
-
-    ollamaShowModal({ query: this.currentQuery, model }); // loading state
+    ollamaShowModal({ query: this.currentQuery, model });
 
     const siteCount = Object.keys(this.responses).length;
     if (siteCount === 0) {
-      ollamaUpdateContent('⚠️ No se pudo capturar ninguna respuesta de los AIs.');
+      ollamaUpdateContent('\u26A0\uFE0F No se pudo capturar ninguna respuesta de los AIs.');
       return;
     }
 
+    // Cap each response to keep total prompt under ~24k chars (~6-8k tokens)
+    // to leave headroom for synthesis output. Adjust if you have a larger context model.
+    const MAX_CHARS_PER_RESPONSE = Math.floor(20000 / siteCount);
     const responseBlocks = Object.entries(this.responses)
-      .map(([site, { content, timedOut }]) =>
-        `### ${site}${timedOut ? ' *(respuesta incompleta)*' : ''}\n${content}`)
+      .map(([site, { content, timedOut }]) => {
+        let body = content || '';
+        if (body.length > MAX_CHARS_PER_RESPONSE) {
+          body = body.slice(0, MAX_CHARS_PER_RESPONSE) + '\n[\u2026 truncado: ' + (content.length - MAX_CHARS_PER_RESPONSE) + ' chars m\u00E1s]';
+        }
+        return '### ' + site + (timedOut ? ' *(incompleta)*' : '') + '\n' + body;
+      })
       .join('\n\n---\n\n');
 
-    const prompt = `Eres un asistente experto que sintetiza respuestas de múltiples IAs en una única respuesta final, clara y completa.
-
-El usuario preguntó: "${this.currentQuery}"
-
-Aquí están las respuestas de ${siteCount} IAs:
-
-${responseBlocks}
-
----
-
-Analiza todas las respuestas anteriores. Identifica los puntos de acuerdo, resuelve contradicciones, y entrega una única respuesta unificada, completa y bien estructurada. Responde directamente al usuario, sin mencionar que estás sintetizando ni hacer referencia a los nombres de los AIs.`;
+    const prompt = 'Eres un asistente experto que sintetiza respuestas de m\u00FAltiples IAs.\n\nEl usuario pregunt\u00F3: "' + this.currentQuery + '"\n\nAqu\u00ED est\u00E1n las respuestas de ' + siteCount + ' IAs:\n\n' + responseBlocks + '\n\n---\n\nSintetiza la mejor respuesta posible tomando lo mejor de cada una. Responde directamente sin mencionar que est\u00E1s sintetizando.';
+    console.log('\u{1F916} Ollama: prompt size', prompt.length, 'chars');
 
     try {
       const res = await fetch('http://localhost:11434/api/generate', {
@@ -3948,13 +3965,45 @@ Analiza todas las respuestas anteriores. Identifica los puntos de acuerdo, resue
         body: JSON.stringify({ model, prompt, stream: true }),
         signal: AbortSignal.timeout(180000)
       });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
+      if (res.status === 403) {
+        ollamaUpdateContent(
+          '\u274C HTTP 403 — Ollama est\u00E1 bloqueando esta extensi\u00F3n por CORS.\n\n' +
+          'Soluci\u00F3n (Windows PowerShell, una sola vez):\n\n' +
+          '  1) Cerr\u00E1 Ollama (icono en bandeja \u2192 Quit).\n' +
+          '  2) Abr\u00ED PowerShell y ejecut\u00E1:\n' +
+          '       setx OLLAMA_ORIGINS "chrome-extension://*"\n' +
+          '  3) Volv\u00E9 a abrir Ollama.\n\n' +
+          'Si quer\u00E9s permitir cualquier origen (m\u00E1s permisivo):\n' +
+          '       setx OLLAMA_ORIGINS "*"\n\n' +
+          'M\u00E1s info: https://github.com/ollama/ollama/blob/main/docs/faq.md#how-can-i-allow-additional-web-origins-to-access-ollama'
+        );
+        return;
+      }
+      if (!res.ok) {
+        // Read body to surface Ollama's actual error message
+        let bodyText = '';
+        try { bodyText = await res.text(); } catch (e) {}
+        let detail = bodyText;
+        try {
+          const j = JSON.parse(bodyText);
+          if (j.error) detail = j.error;
+        } catch (e) {}
+        const promptLen = prompt.length;
+        let hint = '';
+        if (res.status === 500) {
+          hint =
+            '\n\nPosibles causas (HTTP 500):\n' +
+            '  \u2022 El prompt (' + promptLen + ' chars) excede el contexto del modelo.\n' +
+            '  \u2022 Memoria insuficiente para cargar el modelo.\n' +
+            '  \u2022 El modelo "' + model + '" no acepta /api/generate (probar /api/chat).\n' +
+            '  \u2022 Modelo corrupto \u2014 prob\u00E1: ollama pull ' + model;
+        }
+        ollamaUpdateContent('\u274C Ollama error HTTP ' + res.status + '\n\nDetalle del servidor:\n' + (detail || '(sin cuerpo)') + hint);
+        return;
+      }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let fullText = '';
-
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -3963,202 +4012,123 @@ Analiza todas las respuestas anteriores. Identifica los puntos de acuerdo, resue
           if (!line.trim()) continue;
           try {
             const json = JSON.parse(line);
-            if (json.response) {
-              fullText += json.response;
-              ollamaUpdateContent(fullText);
-            }
-          } catch { /* partial JSON line */ }
+            if (json.response) { fullText += json.response; ollamaUpdateContent(fullText); }
+          } catch {}
         }
       }
     } catch (err) {
-      ollamaUpdateContent(`❌ Error al llamar a Ollama: ${err.message}`);
+      ollamaUpdateContent('\u274C Error al llamar a Ollama: ' + err.message);
     }
   }
 };
 
-
-// ── Modal UI ─────────────────────────────────────────────────
-
 function ollamaEnsureModal() {
   if (document.getElementById('ollama-synthesis-modal')) return;
-
   const style = document.createElement('style');
   style.textContent = `
-    #ollama-synthesis-modal {
-      display: none; position: fixed; inset: 0; z-index: 99999;
-    }
-    #ollama-overlay {
-      position: absolute; inset: 0;
-      background: rgba(0,0,0,0.72); backdrop-filter: blur(5px);
-      display: flex; align-items: center; justify-content: center;
-      animation: ol-fadein .2s ease;
-    }
+    #ollama-synthesis-modal { display:none; position:fixed; inset:0; z-index:99999; }
+    #ollama-overlay { position:absolute; inset:0; background:rgba(0,0,0,.72); backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; animation:ol-fadein .2s ease; }
     @keyframes ol-fadein { from{opacity:0} to{opacity:1} }
-    #ollama-dialog {
-      background: #1a1a2e; color: #e2e8f0;
-      border: 1px solid rgba(167,139,250,.35);
-      border-radius: 18px; width: 740px; max-width: 93vw;
-      max-height: 82vh; display: flex; flex-direction: column;
-      box-shadow: 0 28px 72px rgba(0,0,0,.65), 0 0 0 1px rgba(167,139,250,.12);
-      animation: ol-slidein .25s ease;
-    }
+    #ollama-dialog { background:#1a1a2e; color:#e2e8f0; border:1px solid rgba(167,139,250,.35); border-radius:18px; width:740px; max-width:93vw; max-height:82vh; display:flex; flex-direction:column; box-shadow:0 28px 72px rgba(0,0,0,.65); animation:ol-slidein .25s ease; }
     @keyframes ol-slidein { from{transform:translateY(22px);opacity:0} to{transform:translateY(0);opacity:1} }
-    #ollama-dialog .ol-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 20px 24px 14px; border-bottom: 1px solid rgba(255,255,255,.07);
-      flex-shrink: 0;
-    }
-    #ollama-dialog .ol-title-wrap {
-      display: flex; align-items: center; gap: 12px;
-    }
-    #ollama-dialog .ol-icon { font-size: 30px; line-height: 1; }
-    #ollama-dialog .ol-title { font-size: 18px; font-weight: 700; color: #a78bfa; }
-    #ollama-dialog .ol-model  { font-size: 11px; color: #475569; margin-top: 3px; }
-    #ollama-dialog .ol-close {
-      background: none; border: none; color: #475569; font-size: 18px;
-      cursor: pointer; padding: 4px 8px; border-radius: 7px; transition: .15s;
-    }
-    #ollama-dialog .ol-close:hover { background: rgba(255,255,255,.08); color: #e2e8f0; }
-    #ollama-dialog .ol-query {
-      padding: 9px 24px; font-size: 12px; color: #64748b; font-style: italic;
-      border-bottom: 1px solid rgba(255,255,255,.05);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0;
-    }
-    #ollama-dialog .ol-body {
-      flex: 1; overflow-y: auto; padding: 20px 24px;
-      scrollbar-width: thin; scrollbar-color: rgba(167,139,250,.3) transparent;
-    }
-    #ollama-dialog .ol-loading {
-      display: flex; align-items: center; gap: 12px; color: #94a3b8; padding: 16px 0;
-    }
-    #ollama-dialog .ol-spinner {
-      width: 20px; height: 20px; border: 2px solid rgba(167,139,250,.3);
-      border-top-color: #a78bfa; border-radius: 50%;
-      animation: ol-spin .8s linear infinite; flex-shrink: 0;
-    }
+    #ollama-dialog .ol-header { display:flex; align-items:center; justify-content:space-between; padding:20px 24px 14px; border-bottom:1px solid rgba(255,255,255,.07); flex-shrink:0; }
+    #ollama-dialog .ol-title-wrap { display:flex; align-items:center; gap:12px; }
+    #ollama-dialog .ol-icon { font-size:30px; line-height:1; }
+    #ollama-dialog .ol-title { font-size:18px; font-weight:700; color:#a78bfa; }
+    #ollama-dialog .ol-model { font-size:11px; color:#475569; margin-top:3px; }
+    #ollama-dialog .ol-model-row { display:flex; align-items:center; gap:8px; margin-top:4px; }
+    #ollama-dialog .ol-model-label { font-size:11px; color:#94a3b8; }
+    #ollama-dialog .ol-model-select { background:#0f0f1e; color:#e2e8f0; border:1px solid rgba(167,139,250,.35); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer; max-width:240px; }
+    #ollama-dialog .ol-model-select:hover { border-color:#a78bfa; }
+    #ollama-dialog .ol-retry-btn { background:rgba(167,139,250,.15); color:#a78bfa; border:1px solid rgba(167,139,250,.35); border-radius:6px; padding:3px 10px; font-size:11px; cursor:pointer; transition:.15s; }
+    #ollama-dialog .ol-retry-btn:hover { background:rgba(167,139,250,.25); color:#fff; }
+    #ollama-dialog .ol-close { background:none; border:none; color:#475569; font-size:18px; cursor:pointer; padding:4px 8px; border-radius:7px; transition:.15s; }
+    #ollama-dialog .ol-close:hover { background:rgba(255,255,255,.08); color:#e2e8f0; }
+    #ollama-dialog .ol-query { padding:9px 24px; font-size:12px; color:#64748b; font-style:italic; border-bottom:1px solid rgba(255,255,255,.05); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0; }
+    #ollama-dialog .ol-body { flex:1; overflow-y:auto; padding:20px 24px; scrollbar-width:thin; scrollbar-color:rgba(167,139,250,.3) transparent; }
+    #ollama-dialog .ol-loading { display:flex; align-items:center; gap:12px; color:#94a3b8; padding:16px 0; }
+    #ollama-dialog .ol-spinner { width:20px; height:20px; border:2px solid rgba(167,139,250,.3); border-top-color:#a78bfa; border-radius:50%; animation:ol-spin .8s linear infinite; flex-shrink:0; }
     @keyframes ol-spin { to{transform:rotate(360deg)} }
-    #ollama-dialog .ol-content {
-      display: none; font-size: 14px; line-height: 1.75; color: #e2e8f0;
-      white-space: pre-wrap; word-break: break-word;
-    }
-    #ollama-dialog .ol-sites-label {
-      font-size: 11px; color: #475569; margin-bottom: 14px;
-    }
+    #ollama-dialog .ol-content { display:none; font-size:14px; line-height:1.75; color:#e2e8f0; white-space:pre-wrap; word-break:break-word; }
+    #ollama-dialog .ol-sites-label { font-size:11px; color:#475569; margin-bottom:14px; }
   `;
   document.head.appendChild(style);
-
   const modal = document.createElement('div');
   modal.id = 'ollama-synthesis-modal';
-  modal.innerHTML = `
-    <div id="ollama-overlay">
-      <div id="ollama-dialog">
-        <div class="ol-header">
-          <div class="ol-title-wrap">
-            <span class="ol-icon">🧠</span>
-            <div>
-              <div class="ol-title">Síntesis Final · Ollama</div>
-              <div class="ol-model" id="ol-model-label"></div>
-            </div>
-          </div>
-          <button class="ol-close" id="ol-close-btn">✕</button>
-        </div>
-        <div class="ol-query" id="ol-query-label"></div>
-        <div class="ol-body">
-          <div class="ol-sites-label" id="ol-sites-label"></div>
-          <div class="ol-loading" id="ol-loading">
-            <div class="ol-spinner"></div>
-            <span>Sintetizando respuestas...</span>
-          </div>
-          <div class="ol-content" id="ol-content"></div>
-        </div>
-      </div>
-    </div>`;
+  modal.innerHTML =
+    '<div id="ollama-overlay"><div id="ollama-dialog">' +
+      '<div class="ol-header">' +
+        '<div class="ol-title-wrap">' +
+          '<span class="ol-icon">&#x1F9E0;</span>' +
+          '<div>' +
+            '<div class="ol-title">S\u00EDntesis Final \u00B7 Ollama</div>' +
+            '<div class="ol-model" id="ol-model-label"></div>' +
+            '<div class="ol-model-row">' +
+              '<span class="ol-model-label">Modelo:</span>' +
+              '<select class="ol-model-select" id="ol-model-select"><option>cargando...</option></select>' +
+              '<button class="ol-retry-btn" id="ol-retry-btn" title="Reintentar con el modelo seleccionado">\u21BB Reintentar</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<button class="ol-close" id="ol-close-btn">\u2715</button>' +
+      '</div>' +
+      '<div class="ol-query" id="ol-query-label"></div>' +
+      '<div class="ol-body">' +
+        '<div class="ol-sites-label" id="ol-sites-label"></div>' +
+        '<div class="ol-loading" id="ol-loading"><div class="ol-spinner"></div><span>Sintetizando respuestas...</span></div>' +
+        '<div class="ol-content" id="ol-content"></div>' +
+      '</div>' +
+    '</div></div>';
   document.body.appendChild(modal);
+  document.getElementById('ol-close-btn').addEventListener('click', () => { modal.style.display = 'none'; });
+  document.getElementById('ollama-overlay').addEventListener('click', e => { if (e.target.id === 'ollama-overlay') modal.style.display = 'none'; });
 
-  document.getElementById('ol-close-btn').addEventListener('click', () => {
-    modal.style.display = 'none';
+  // When user picks a different model, persist and retry synthesis
+  document.getElementById('ol-model-select').addEventListener('change', async (e) => {
+    await OllamaSynthesizer.setPreferredModel(e.target.value);
+    console.log('\u{1F916} Ollama: model preference saved =', e.target.value);
   });
-  document.getElementById('ollama-overlay').addEventListener('click', e => {
-    if (e.target.id === 'ollama-overlay') modal.style.display = 'none';
+  document.getElementById('ol-retry-btn').addEventListener('click', async () => {
+    const sel = document.getElementById('ol-model-select');
+    if (sel && sel.value) await OllamaSynthesizer.setPreferredModel(sel.value);
+    // Re-run synthesis with same query, fresh AIs
+    const q = OllamaSynthesizer.currentQuery;
+    if (!q) return;
+    const allIframes = document.querySelectorAll('iframe.ai-iframe');
+    OllamaSynthesizer.startCollection(q, allIframes);
   });
+
+  // Populate dropdown on first open
+  ollamaPopulateModelDropdown();
+}
+
+async function ollamaPopulateModelDropdown() {
+  const sel = document.getElementById('ol-model-select');
+  if (!sel) return;
+  const models = await OllamaSynthesizer.listAvailableModels();
+  let pinned = null;
+  try {
+    const stored = await chrome.storage.local.get('ollamaPreferredModel');
+    pinned = stored.ollamaPreferredModel || null;
+  } catch (e) {}
+  if (models.length === 0) {
+    sel.innerHTML = '<option value="">(no se detectaron modelos)</option>';
+    return;
+  }
+  sel.innerHTML = models.map(name => {
+    const selAttr = (pinned && name === pinned) ? ' selected' : '';
+    return '<option value="' + name + '"' + selAttr + '>' + name + '</option>';
+  }).join('');
 }
 
 function ollamaShowModal({ query, model, error }) {
   ollamaEnsureModal();
   const modal = document.getElementById('ollama-synthesis-modal');
   modal.style.display = 'block';
-
-  document.getElementById('ol-query-label').textContent = `"${query}"`;
-  document.getElementById('ol-model-label').textContent = model ? `Modelo: ${model}` : '';
-
+  document.getElementById('ol-query-label').textContent = '"' + query + '"';
+  document.getElementById('ol-model-label').textContent = model ? 'Modelo: ' + model : '';
   const siteNames = Object.keys(OllamaSynthesizer.responses);
-  document.getElementById('ol-sites-label').textContent =
-    siteNames.length > 0 ? `Integrando respuestas de: ${siteNames.join(', ')}` : '';
-
-  document.getElementById('ol-loading').style.display = error ? 'none' : 'flex';
-  const content = document.getElementById('ol-content');
-  content.style.display = error ? 'block' : 'none';
-  if (error) content.textContent = error;
-}
-
-function ollamaUpdateContent(text) {
-  ollamaEnsureModal();
-  const loading = document.getElementById('ol-loading');
-  const content = document.getElementById('ol-content');
-  if (loading) loading.style.display = 'none';
-  if (content) {
-    content.style.display = 'block';
-    content.textContent = text;
-    // Auto-scroll to bottom while streaming
-    content.parentElement.scrollTop = content.parentElement.scrollHeight;
-  }
-}
-
-// ── Wire up RESPONSE_COMPLETE messages from iframes ──────────
-window.addEventListener('message', event => {
-  if (event.data && event.data.type === 'RESPONSE_COMPLETE') {
-    OllamaSynthesizer.receiveResponse(
-      event.data.siteName,
-      event.data.content,
-      event.data.timedOut
-    );
-  }
-});
-
-// ── END OLLAMA SYNTHESIS MODULE ───────────────────────────────
-
-        <div class="ol-body">
-          <div class="ol-sites-label" id="ol-sites-label"></div>
-          <div class="ol-loading" id="ol-loading">
-            <div class="ol-spinner"></div>
-            <span>Sintetizando respuestas...</span>
-          </div>
-          <div class="ol-content" id="ol-content"></div>
-        </div>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-
-  document.getElementById('ol-close-btn').addEventListener('click', () => {
-    modal.style.display = 'none';
-  });
-  document.getElementById('ollama-overlay').addEventListener('click', e => {
-    if (e.target.id === 'ollama-overlay') modal.style.display = 'none';
-  });
-}
-
-function ollamaShowModal({ query, model, error }) {
-  ollamaEnsureModal();
-  const modal = document.getElementById('ollama-synthesis-modal');
-  modal.style.display = 'block';
-
-  document.getElementById('ol-query-label').textContent = `"${query}"`;
-  document.getElementById('ol-model-label').textContent = model ? `Modelo: ${model}` : '';
-
-  const siteNames = Object.keys(OllamaSynthesizer.responses);
-  document.getElementById('ol-sites-label').textContent =
-    siteNames.length > 0 ? `Integrando respuestas de: ${siteNames.join(', ')}` : '';
-
+  document.getElementById('ol-sites-label').textContent = siteNames.length > 0 ? 'Integrando: ' + siteNames.join(', ') : '';
   document.getElementById('ol-loading').style.display = error ? 'none' : 'flex';
   const content = document.getElementById('ol-content');
   content.style.display = error ? 'block' : 'none';
@@ -4177,20 +4147,119 @@ function ollamaUpdateContent(text) {
   }
 }
 
-// Wire up RESPONSE_COMPLETE messages from iframes
+// Open modal in "collecting" state — immediate feedback while we wait for AIs
+function ollamaShowCollectingModal(query, expectedSites) {
+  ollamaEnsureModal();
+  ollamaPopulateModelDropdown(); // refresh model list every time
+  const modal = document.getElementById('ollama-synthesis-modal');
+  modal.style.display = 'block';
+  document.getElementById('ol-query-label').textContent = '"' + query + '"';
+  document.getElementById('ol-model-label').textContent = 'Esperando respuestas de los AIs...';
+  document.getElementById('ol-sites-label').innerHTML =
+    'Recolectando <span id="ol-progress-count">0</span>/' + expectedSites.length + ' \u00B7 ' +
+    expectedSites.map(s => '<span class="ol-site-pill" data-site="' + s + '">\u23F3 ' + s + '</span>').join(' ');
+  // Inject pill styles once
+  if (!document.getElementById('ol-pill-styles')) {
+    const style = document.createElement('style');
+    style.id = 'ol-pill-styles';
+    style.textContent =
+      '.ol-site-pill { display:inline-block; padding:2px 8px; margin:2px 4px 2px 0; border-radius:10px; background:rgba(167,139,250,.12); color:#a78bfa; font-size:11px; transition:all .2s; }' +
+      '.ol-site-pill.done { background:rgba(34,197,94,.15); color:#22c55e; }' +
+      '.ol-site-pill.timeout { background:rgba(239,68,68,.15); color:#ef4444; }';
+    document.head.appendChild(style);
+  }
+  const loading = document.getElementById('ol-loading');
+  const content = document.getElementById('ol-content');
+  if (loading) {
+    loading.style.display = 'flex';
+    loading.querySelector('span').textContent = 'Esperando que los AIs terminen de responder...';
+  }
+  if (content) {
+    content.style.display = 'none';
+    content.textContent = '';
+  }
+}
+
+// Update progress as each AI's response arrives
+function ollamaUpdateCollectingProgress(siteName, got, total) {
+  const counter = document.getElementById('ol-progress-count');
+  if (counter) counter.textContent = got;
+  const pill = document.querySelector('.ol-site-pill[data-site="' + siteName + '"]');
+  if (pill) {
+    pill.classList.add('done');
+    pill.textContent = '\u2713 ' + siteName;
+  }
+  if (got >= total) {
+    const loading = document.getElementById('ol-loading');
+    if (loading) loading.querySelector('span').textContent = 'Sintetizando con Ollama...';
+    document.getElementById('ol-model-label').textContent = 'Recolecci\u00F3n completa \u00B7 sintetizando...';
+  }
+}
+
 window.addEventListener('message', event => {
   if (event.data && event.data.type === 'RESPONSE_COMPLETE') {
-    OllamaSynthesizer.receiveResponse(
-      event.data.siteName,
-      event.data.content,
-      event.data.timedOut
-    );
+    OllamaSynthesizer.receiveResponse(event.data.siteName, event.data.content, event.data.timedOut);
   }
 });
 
-// END OLLAMA SYNTHESIS MODULE
-      event.data.timedOut
-    );
-  }
-});
+// Eager-load button CSS (independent of modal)
+function ollamaInjectButtonStyles() {
+  if (document.getElementById('ollama-synth-btn-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'ollama-synth-btn-styles';
+  style.textContent = `
+    @keyframes ol-spin-btn { to { transform: rotate(360deg); } }
+    .ollama-synth-btn { display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg,#7c3aed 0%,#a78bfa 100%); color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:13px; font-weight:600; cursor:pointer; transition:all .15s ease; box-shadow:0 2px 6px rgba(124,58,237,.3); margin-left:8px; height:36px; }
+    .ollama-synth-btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(124,58,237,.45); }
+    .ollama-synth-btn:active { transform:translateY(0); box-shadow:0 1px 3px rgba(124,58,237,.3); }
+    .ollama-synth-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
+    .ollama-synth-btn .ollama-synth-icon { font-size:16px; line-height:1; }
+    .ollama-synth-btn .ollama-synth-label { white-space:nowrap; }
+    .ollama-synth-btn.is-running { background:linear-gradient(135deg,#475569 0%,#64748b 100%); pointer-events:none; }
+    .ollama-synth-btn.is-running .ollama-synth-icon { animation: ol-spin-btn 1.2s linear infinite; display:inline-block; }
+  `;
+  document.head.appendChild(style);
+}
+
+// Manual synth button — fires a re-synthesis on demand
+function ollamaWireSynthButton() {
+  ollamaInjectButtonStyles();
+  const btn = document.getElementById('ollamaSynthBtn');
+  if (!btn || btn.dataset.wired === '1') return;
+  btn.dataset.wired = '1';
+  btn.addEventListener('click', () => {
+    const searchInput = document.getElementById('searchInput');
+    const lastQuery = (OllamaSynthesizer.currentQuery || (searchInput && searchInput.value) || '').trim();
+    if (!lastQuery) {
+      ollamaShowModal({ query: '(sin consulta)', model: null, error: '\u26A0\uFE0F Hac\u00E9 una consulta primero antes de sintetizar.' });
+      return;
+    }
+    const allIframes = document.querySelectorAll('iframe.ai-iframe');
+    if (allIframes.length === 0) {
+      ollamaShowModal({ query: lastQuery, model: null, error: '\u26A0\uFE0F No hay AIs activos para sintetizar.' });
+      return;
+    }
+    btn.classList.add('is-running');
+    OllamaSynthesizer.startCollection(lastQuery, allIframes);
+    // Release the running state after the modal closes (poll the modal display)
+    const releaseTimer = setInterval(() => {
+      const modal = document.getElementById('ollama-synthesis-modal');
+      if (!modal || modal.style.display === 'none') {
+        btn.classList.remove('is-running');
+        clearInterval(releaseTimer);
+      }
+    }, 500);
+    // Hard cap so the button doesn't stay stuck if something errors silently
+    setTimeout(() => {
+      btn.classList.remove('is-running');
+      clearInterval(releaseTimer);
+    }, OllamaSynthesizer.COLLECTION_TIMEOUT + 5000);
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', ollamaWireSynthButton);
+} else {
+  ollamaWireSynthButton();
+}
 // END OLLAMA SYNTHESIS MODULE

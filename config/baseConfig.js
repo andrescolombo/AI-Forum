@@ -430,70 +430,69 @@ if (typeof window === 'undefined') {
   
   self.getDefaultSites = async function() {
     try {
-      
-      
-      console.log('尝试从 remoteSiteHandlers 读取SiteConfig...');
-      let baseSites = [];
+
+      // Load local siteHandlers.json — source of truth for structural props
+      let localSites = [];
+      try {
+        const response = await fetch(chrome.runtime.getURL('config/siteHandlers.json'));
+        if (response.ok) {
+          const localConfig = await response.json();
+          localSites = localConfig.sites || localConfig || [];
+          console.log('从本地文件LoadSiteConfigSuccessful, 数量:', localSites.length);
+        }
+      } catch (error) {
+        console.error('从本地文件LoadConfigFailed:', error);
+      }
+
+      // Load remote cache — has rich handler data (searchHandler, contentExtractor, etc.)
+      let remoteSites = [];
       try {
         const result = await chrome.storage.local.get('remoteSiteHandlers');
         if (result.remoteSiteHandlers && result.remoteSiteHandlers.sites && result.remoteSiteHandlers.sites.length > 0) {
-          baseSites = result.remoteSiteHandlers.sites;
+          remoteSites = result.remoteSiteHandlers.sites;
           console.log('从 remoteSiteHandlers LoadSiteConfigSuccessful');
-          console.log('remoteSiteHandlers Load的SiteConfig:', baseSites.map(site => ({ name: site.name, enabled: site.enabled })));
         }
       } catch (error) {
         console.error('从 remoteSiteHandlers 读取ConfigFailed:', error);
       }
-      
-      
+
+      // Load user preferences
       let userSettings = {};
       try {
         const { sites: userSiteSettings = {} } = await chrome.storage.sync.get('sites');
         userSettings = userSiteSettings;
         console.log('从 chrome.storage.sync Load用户SettingsSuccessful');
-        console.log('chrome.storage.sync Load的用户Settings:', Object.keys(userSettings).map(name => ({ name, enabled: userSettings[name]?.enabled })));
       } catch (error) {
         console.error('从 chrome.storage.sync 读取用户SettingsFailed:', error);
       }
-      
-      
-      if (baseSites && baseSites.length > 0) {
+
+      const remoteByName = {};
+      remoteSites.forEach(s => { remoteByName[s.name] = s; });
+
+      const baseSites = localSites.length > 0 ? localSites : remoteSites;
+
+      if (baseSites.length > 0) {
         const mergedSites = baseSites.map(site => {
+          const remote = remoteByName[site.name] || {};
           const userSiteData = userSettings[site.name] || {};
           return {
-            ...site,
+            ...remote,   // rich handler data from remote
+            ...site,     // structural overrides from local JSON
             order: userSiteData.order !== undefined ? userSiteData.order : site.order,
             enabled: userSiteData.enabled !== undefined ? userSiteData.enabled : site.enabled
           };
         });
-        
-        
+
         mergedSites.sort((a, b) => {
           const orderA = a.order !== undefined ? a.order : 999;
           const orderB = b.order !== undefined ? b.order : 999;
           return orderA - orderB;
         });
-        
+
         console.log('合并ConfigSuccessful，Site数量:', mergedSites.length);
-        console.log('合并ConfigSuccessful，SiteConfig:', mergedSites.map(site => ({ name: site.name, enabled: site.enabled })));
         return mergedSites;
       }
-      
-      
-      console.log('remoteSiteHandlers 中无数据，尝试从本地文件Load...');
-      try {
-        const response = await fetch(chrome.runtime.getURL('config/siteHandlers.json'));
-        if (response.ok) {
-          const localConfig = await response.json();
-          if (localConfig.sites && localConfig.sites.length > 0) {
-            console.log('从本地文件LoadSiteConfigSuccessful');
-            return localConfig.sites;
-          }
-        }
-      } catch (error) {
-        console.error('从本地文件LoadConfigFailed:', error);
-      }
-      
+
       console.warn('无法获取SiteConfig，返回空数组');
       return [];
     } catch (error) {
@@ -531,8 +530,8 @@ else {
   window.getDefaultSites = async function() {
     try {
 
-      // Always load local siteHandlers.json first — it's the source of truth
-      // for structural properties (hidden, supportIframe, supportUrlQuery, url, name).
+      // Load local siteHandlers.json — source of truth for structural props
+      // (hidden, supportIframe, supportUrlQuery, url, name).
       let localSites = [];
       try {
         const response = await fetch(chrome.runtime.getURL('config/siteHandlers.json'));
@@ -545,6 +544,18 @@ else {
         console.error('从本地文件LoadConfigFailed:', error);
       }
 
+      // Load remote cache — has rich handler data (searchHandler, contentExtractor, etc.)
+      let remoteSites = [];
+      try {
+        const result = await chrome.storage.local.get('remoteSiteHandlers');
+        if (result.remoteSiteHandlers && result.remoteSiteHandlers.sites && result.remoteSiteHandlers.sites.length > 0) {
+          remoteSites = result.remoteSiteHandlers.sites;
+          console.log('从 remoteSiteHandlers LoadSiteConfigSuccessful');
+        }
+      } catch (error) {
+        console.error('从 remoteSiteHandlers 读取ConfigFailed:', error);
+      }
+
       // Load user preferences (enabled, order) from sync storage
       let userSettings = {};
       try {
@@ -555,14 +566,24 @@ else {
         console.error('从 chrome.storage.sync 读取用户SettingsFailed:', error);
       }
 
-      // Use local sites as base, apply only user preferences on top
-      const baseSites = localSites.length > 0 ? localSites : [];
+      // Build index of remote sites by name for quick lookup
+      const remoteByName = {};
+      remoteSites.forEach(s => { remoteByName[s.name] = s; });
+
+      // Start from local JSON (structural truth), merge rich handler data from remote,
+      // then apply user preferences on top.
+      const baseSites = localSites.length > 0 ? localSites : remoteSites;
 
       if (baseSites.length > 0) {
         const mergedSites = baseSites.map(site => {
+          const remote = remoteByName[site.name] || {};
           const userSiteData = userSettings[site.name] || {};
           return {
+            // Rich handler data from remote (searchHandler, contentExtractor, etc.)
+            ...remote,
+            // Structural overrides from local JSON (hidden, supportIframe, url, name)
             ...site,
+            // User preferences override both
             order: userSiteData.order !== undefined ? userSiteData.order : site.order,
             enabled: userSiteData.enabled !== undefined ? userSiteData.enabled : site.enabled
           };
@@ -618,4 +639,3 @@ else {
 }
 
 } 
-

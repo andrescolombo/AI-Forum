@@ -374,3 +374,13 @@ if (typeof window !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { SiteDetector, siteDetector };
 }
+} else if (typeof self !== 'undefined') {
+  self.siteDetector = siteDetector;
+  self.getSiteHandler = (domain) => siteDetector.getSiteHandler(domain);
+  self.isAISite = (domain) => siteDetector.isAISite(domain);
+  self.getSiteNameFromDomain = (domain) => siteDetector.getSiteNameFromDomain(domain);
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { SiteDetector, siteDetector };
+}

@@ -711,4 +711,3 @@ function showToast(message, duration = 2000) {
         }, 300);
     }, duration);
 }
-

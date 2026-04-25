@@ -1841,7 +1841,7 @@
       "supportUrlQuery": true,
       "region": "US",
       "hidden": false,
-      "supportIframe": true,
+      "supportIframe": false,
       "searchHandler": {
         "steps": [
           {
