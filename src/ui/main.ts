@@ -1,11 +1,17 @@
 /**
  * Entry point for the Multi-AI extension page.
- * Wires SearchBar + IframesGrid + SynthesisView + Synthesizer + storage.
  */
 
 import { loadPrefs, patchPrefs } from '@/lib/storage';
 import { SITE_IDS, SITES } from '@/sites/registry';
-import type { DisplayMode, SiteId, SyncedPrefs } from '@/types';
+import type {
+  BackgroundRequest,
+  BackgroundResponse,
+  DisplayMode,
+  SiteId,
+  SiteResponse,
+  SyncedPrefs
+} from '@/types';
 import { IframesGrid } from './components/IframesGrid';
 import { SearchBar } from './components/SearchBar';
 import { SynthesisModalView, SynthesisPanelView } from './components/SynthesisView';
@@ -19,6 +25,8 @@ class App {
   private panelView = new SynthesisPanelView();
   private synthesizer!: Synthesizer;
   private submitTimersBySite = new Map<SiteId, number[]>();
+  private mountedKey = '';
+  private perplexityResponse: SiteResponse | null = null;
 
   async init(): Promise<void> {
     this.prefs = await loadPrefs();
@@ -30,31 +38,34 @@ class App {
       onToggleMode: () => this.onToggleMode()
     });
 
-    this.grid = new IframesGrid();
+    this.grid = new IframesGrid({
+      onOpenPerplexity: () => {
+        void this.openPerplexity(true);
+      }
+    });
 
     const root = document.getElementById('app')!;
     root.append(this.searchBar.el, this.grid.el);
 
-    // Build the synthesizer wired to whichever view is currently active.
-    this.synthesizer = new Synthesizer(
-      this.activeView(),
+    this.synthesizer = this.createSynthesizer(this.activeView());
+    this.panelView.onClose(() => this.grid.detachPanel(this.panelView.el));
+    window.addEventListener('message', (ev) => this.onFrameMessage(ev));
+
+    this.searchBar.setPrefs(this.prefs);
+    this.mountGrid();
+
+    void this.synthesizer.refreshModelList();
+    this.searchBar.focus();
+  }
+
+  private createSynthesizer(view: SynthesisModalView | SynthesisPanelView): Synthesizer {
+    return new Synthesizer(
+      view,
       () => this.prefs.preferredModel,
       async (m) => {
         this.prefs = await patchPrefs({ preferredModel: m });
       }
     );
-
-    this.panelView.onClose(() => this.grid.detachPanel(this.panelView.el));
-    window.addEventListener('message', (ev) => this.onFrameMessage(ev));
-
-    // First mount: show iframes for currently-enabled sites.
-    this.searchBar.setPrefs(this.prefs);
-    this.grid.mount(this.enabledSiteIds());
-
-    // Refresh model list once on load so the dropdown is populated when modal opens.
-    void this.synthesizer.refreshModelList();
-
-    this.searchBar.focus();
   }
 
   private activeView() {
@@ -65,26 +76,31 @@ class App {
     return SITE_IDS.filter((id) => this.prefs.enabledSites[id]);
   }
 
-  private onSubmit(query: string): void {
-    // Re-mount if the enabled set has changed since last mount.
+  private mountGrid(): void {
     const enabled = this.enabledSiteIds();
-    if (enabled.length !== this.grid.list().length) {
-      this.grid.mount(enabled);
-    }
+    const key = enabled.join('|');
+    if (key === this.mountedKey) return;
+    this.grid.mount(enabled);
+    this.mountedKey = key;
+  }
+
+  private onSubmit(query: string): void {
+    this.mountGrid();
     this.clearSubmitTimers();
-    // For sites with queryUrlTemplate this is a navigation; for others this
-    // keeps the iframe on its current/new-chat URL.
+    this.perplexityResponse = null;
+
     this.grid.submitViaUrl(query);
-    // Content scripts can report READY before this submit starts, and SPA
-    // navigations do not always fire a useful iframe load event. Send with
-    // short retries instead of waiting on a single race-prone event.
     this.scheduleDomSubmissions(query);
+
+    if (this.prefs.enabledSites.perplexity) {
+      void this.submitPerplexity(query);
+    }
   }
 
   private scheduleDomSubmissions(query: string): void {
     for (const frame of this.grid.list()) {
       const site = SITES[frame.siteId];
-      if (site.queryUrlTemplate) continue; // already submitted via URL
+      if (site.queryUrlTemplate) continue;
       this.retrySubmitToFrame(frame.siteId, frame.origin, frame.iframe, query);
     }
   }
@@ -95,7 +111,8 @@ class App {
     iframe: HTMLIFrameElement,
     query: string
   ): void {
-    const delays = [250, 900, 1800, 3200, 5200, 8000, 12000];
+    const delays =
+      siteId === 'claude' ? [700, 3000, 7000] : [250, 900, 1800, 3200, 5200, 8000, 12000];
     const requestId = `submit-${siteId}-${Date.now()}`;
     const timers: number[] = [];
     this.submitTimersBySite.set(siteId, timers);
@@ -138,16 +155,9 @@ class App {
   }
 
   private async onSynth(): Promise<void> {
-    const query = this.lastQuery() ?? '(sin consulta — pedí algo primero)';
+    const query = this.lastQuery() ?? '(sin consulta - pedi algo primero)';
     const view = this.activeView();
-    // Re-build synthesizer so it points at the currently-active view.
-    this.synthesizer = new Synthesizer(
-      view,
-      () => this.prefs.preferredModel,
-      async (m) => {
-        this.prefs = await patchPrefs({ preferredModel: m });
-      }
-    );
+    this.synthesizer = this.createSynthesizer(view);
 
     if (view === this.panelView) {
       this.grid.attachPanel(this.panelView.el);
@@ -155,7 +165,8 @@ class App {
 
     this.searchBar.setSynthRunning(true);
     try {
-      await this.synthesizer.run(query, this.grid.list());
+      const extraResponses = await this.perplexityResponseForSynthesis();
+      await this.synthesizer.run(query, this.grid.list(), extraResponses);
     } finally {
       this.searchBar.setSynthRunning(false);
     }
@@ -165,7 +176,8 @@ class App {
     this.prefs = await patchPrefs({
       enabledSites: { ...this.prefs.enabledSites, [siteId]: enabled }
     });
-    this.grid.mount(this.enabledSiteIds());
+    this.mountedKey = '';
+    this.mountGrid();
   }
 
   private async onToggleMode(): Promise<void> {
@@ -174,11 +186,137 @@ class App {
     this.searchBar.setPrefs(this.prefs);
   }
 
+  private async submitPerplexity(query: string): Promise<void> {
+    this.grid.setMirrorStatus(
+      'perplexity',
+      'Abriendo Perplexity en una pestana en segundo plano...',
+      'busy'
+    );
+    this.grid.setMirrorContent('perplexity', 'Esperando respuesta de Perplexity...');
+
+    const submit = await this.sendBackground({
+      type: 'MULTIAI_PERPLEXITY_SUBMIT',
+      query
+    });
+
+    if (!submit.ok) {
+      this.showPerplexityError(submit);
+      return;
+    }
+
+    this.grid.setMirrorStatus('perplexity', 'Pregunta enviada. Capturando respuesta visible...', 'busy');
+    await this.pollPerplexityAnswer(query);
+  }
+
+  private async pollPerplexityAnswer(query: string): Promise<SiteResponse | null> {
+    const started = Date.now();
+    let lastText = '';
+    let stableCount = 0;
+    const minCaptureMs = 12000;
+    const stablePollsNeeded = 3;
+
+    while (Date.now() - started < 90000) {
+      await sleep(2500);
+      const extracted = await this.sendBackground({ type: 'MULTIAI_PERPLEXITY_EXTRACT', query });
+
+      if (!extracted.ok) {
+        if (extracted.needsUserAction) {
+          this.showPerplexityError(extracted);
+          return null;
+        }
+        this.grid.setMirrorStatus(
+          'perplexity',
+          extracted.error ?? 'Esperando respuesta de Perplexity...',
+          'busy'
+        );
+        continue;
+      }
+
+      const text = extracted.text?.trim() ?? '';
+      if (!text) continue;
+
+      const elapsed = Date.now() - started;
+      const changed = text !== lastText;
+      if (changed) stableCount = 0;
+      else stableCount += 1;
+      lastText = text;
+
+      this.grid.setMirrorContent('perplexity', text);
+      const ready = elapsed >= minCaptureMs && stableCount >= stablePollsNeeded;
+      this.grid.setMirrorStatus(
+        'perplexity',
+        ready
+          ? 'Respuesta lista para sintetizar.'
+          : `Capturando Perplexity... ${text.length.toLocaleString()} caracteres`,
+        ready ? 'ok' : 'busy'
+      );
+
+      if (ready) {
+        this.perplexityResponse = { siteId: 'perplexity', text };
+        return this.perplexityResponse;
+      }
+    }
+
+    if (lastText) {
+      this.perplexityResponse = { siteId: 'perplexity', text: lastText };
+      this.grid.setMirrorStatus('perplexity', 'Tiempo agotado; se usara la respuesta parcial.', 'ok');
+      return this.perplexityResponse;
+    }
+
+    this.grid.setMirrorStatus('perplexity', 'No se pudo capturar respuesta de Perplexity.', 'fail');
+    return null;
+  }
+
+  private async perplexityResponseForSynthesis(): Promise<SiteResponse[]> {
+    if (!this.prefs.enabledSites.perplexity) return [];
+    if (this.perplexityResponse?.text) return [this.perplexityResponse];
+
+    const extracted = await this.sendBackground({
+      type: 'MULTIAI_PERPLEXITY_EXTRACT',
+      query: this.lastQuery() ?? undefined
+    });
+    if (extracted.ok && extracted.text?.trim()) {
+      this.perplexityResponse = { siteId: 'perplexity', text: extracted.text.trim() };
+      this.grid.setMirrorContent('perplexity', this.perplexityResponse.text);
+      this.grid.setMirrorStatus('perplexity', 'Respuesta capturada para sintetizar.', 'ok');
+      return [this.perplexityResponse];
+    }
+    return [];
+  }
+
+  private async openPerplexity(active: boolean): Promise<void> {
+    const response = await this.sendBackground({ type: 'MULTIAI_PERPLEXITY_OPEN', active });
+    if (!response.ok) this.showPerplexityError(response);
+  }
+
+  private showPerplexityError(response: BackgroundResponse): void {
+    const message = response.needsUserAction
+      ? 'Perplexity necesita verificacion humana. Usa "Abrir", resolvelo una vez y vuelve a la extension.'
+      : response.error ?? 'No se pudo usar Perplexity.';
+    this.grid.setMirrorStatus('perplexity', message, 'fail');
+    this.grid.setMirrorContent('perplexity', message);
+  }
+
+  private async sendBackground(message: BackgroundRequest): Promise<BackgroundResponse> {
+    try {
+      return (await chrome.runtime.sendMessage(message)) as BackgroundResponse;
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+        needsUserAction: false
+      };
+    }
+  }
+
   private lastQuery(): string | null {
-    // We don't currently persist the last query — read it from the textarea.
     const ta = document.querySelector<HTMLTextAreaElement>('.search-bar textarea');
     return ta?.value.trim() || null;
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -187,7 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const app = document.getElementById('app');
     if (app) {
       app.innerHTML =
-        '<div class="error-box" style="margin: 24px;">No se pudo iniciar la extensión: ' +
+        '<div class="error-box" style="margin: 24px;">No se pudo iniciar la extension: ' +
         String((e as Error).message) +
         '</div>';
     }

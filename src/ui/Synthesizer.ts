@@ -1,7 +1,7 @@
 import { OllamaClient, OllamaError } from '@/synth/ollama';
 import { buildSynthesisPrompt } from '@/synth/prompt';
 import { awaitAnswer, newRequestId, postToFrame } from '@/lib/messaging';
-import type { SiteResponse } from '@/types';
+import type { SiteId, SiteResponse } from '@/types';
 import type { SynthesisView } from './components/SynthesisView';
 import type { FrameRef } from './components/IframesGrid';
 
@@ -36,18 +36,22 @@ export class Synthesizer {
     this.currentAbort = null;
   }
 
-  async run(query: string, frames: readonly FrameRef[]): Promise<void> {
+  async run(
+    query: string,
+    frames: readonly FrameRef[],
+    extraResponses: readonly SiteResponse[] = []
+  ): Promise<void> {
     this.cancel();
     const ctrl = new AbortController();
     this.currentAbort = ctrl;
 
-    if (frames.length === 0) {
+    if (frames.length === 0 && extraResponses.length === 0) {
       this.view.show(query, []);
       this.view.showError('No hay AIs activos para sintetizar.');
       return;
     }
 
-    const siteIds = frames.map((f) => f.siteId);
+    const siteIds = uniqueSiteIds([...frames.map((f) => f.siteId), ...extraResponses.map((r) => r.siteId)]);
     this.view.show(query, siteIds);
 
     // Kick off model list refresh in parallel — show what we have ASAP.
@@ -56,7 +60,11 @@ export class Synthesizer {
     });
 
     // 1. Ask each iframe for its current answer text.
-    const responses = await this.collectAnswers(frames, ctrl.signal);
+    const responses = [...extraResponses];
+    for (const response of extraResponses) {
+      this.view.setProgress(response.siteId, 'ok');
+    }
+    responses.push(...(await this.collectAnswers(frames, ctrl.signal)));
 
     if (ctrl.signal.aborted) return;
 
@@ -166,4 +174,8 @@ export class Synthesizer {
     if (e instanceof Error) return `❌ ${e.message}`;
     return '❌ Error desconocido al hablar con Ollama.';
   }
+}
+
+function uniqueSiteIds(ids: SiteId[]): SiteId[] {
+  return ids.filter((id, index) => ids.indexOf(id) === index);
 }

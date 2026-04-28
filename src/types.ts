@@ -12,6 +12,8 @@ export interface SiteDescriptor {
   newChatUrl: string;   // URL to start a fresh conversation
   /** URL with `{query}` placeholder, if the site supports query-via-URL submission. */
   queryUrlTemplate?: string;
+  /** Render this site as an extension-owned mirror panel instead of an iframe. */
+  mirrorPanel?: boolean;
   iconUrl: string;
 }
 
@@ -102,6 +104,23 @@ export interface SynthesisRequest {
 
 export type DisplayMode = 'modal' | 'panel';
 
+// Background bridge for Perplexity. The UI page talks to the service worker,
+// which controls a real top-level Perplexity tab in the background.
+export type BackgroundRequest =
+  | { type: 'MULTIAI_PERPLEXITY_OPEN'; active?: boolean }
+  | { type: 'MULTIAI_PERPLEXITY_SUBMIT'; query: string }
+  | { type: 'MULTIAI_PERPLEXITY_EXTRACT'; query?: string };
+
+export interface BackgroundResponse {
+  ok: boolean;
+  text?: string;
+  stable?: boolean;
+  tabId?: number;
+  url?: string;
+  error?: string;
+  needsUserAction?: boolean;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Storage schema (chrome.storage.sync + .local)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -117,7 +136,7 @@ export const DEFAULT_PREFS: SyncedPrefs = {
     chatgpt: true,
     claude: true,
     gemini: true,
-    perplexity: false
+    perplexity: true
   },
   displayMode: 'modal'
 };

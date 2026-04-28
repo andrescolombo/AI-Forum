@@ -31,6 +31,7 @@ export const SITES: Record<SiteId, SiteDescriptor> = {
     displayName: 'Perplexity',
     origin: 'https://www.perplexity.ai',
     newChatUrl: 'https://www.perplexity.ai/',
+    mirrorPanel: true,
     iconUrl: 'icons/sites/perplexity.png'
   }
 };

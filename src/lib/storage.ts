@@ -15,10 +15,10 @@ export async function loadPrefs(): Promise<SyncedPrefs> {
     ...stored,
     enabledSites: { ...DEFAULT_PREFS.enabledSites, ...(stored?.enabledSites ?? {}) }
   };
-  const migration = await chrome.storage.local.get('migration_perplexity_off_v1');
-  if (!migration.migration_perplexity_off_v1) {
-    prefs.enabledSites.perplexity = false;
-    await chrome.storage.local.set({ migration_perplexity_off_v1: true });
+  const migration = await chrome.storage.local.get('migration_perplexity_bridge_v1');
+  if (!migration.migration_perplexity_bridge_v1) {
+    prefs.enabledSites.perplexity = true;
+    await chrome.storage.local.set({ migration_perplexity_bridge_v1: true });
     await savePrefs(prefs);
   }
   return prefs;

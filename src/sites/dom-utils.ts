@@ -72,6 +72,14 @@ export function typeIntoContentEditable(el: HTMLElement, text: string): void {
   const sel = window.getSelection();
   sel?.removeAllRanges();
   sel?.addRange(range);
+  el.dispatchEvent(
+    new InputEvent('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: text
+    })
+  );
   // execCommand is deprecated but still the only path that works for these
   // editors. Their react-side observers listen for `beforeinput`/`input` events
   // dispatched by the browser, not by us.
@@ -85,6 +93,7 @@ export function typeIntoContentEditable(el: HTMLElement, text: string): void {
       data: text
     })
   );
+  el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 export function pressEnter(el: HTMLElement): void {

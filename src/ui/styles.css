@@ -231,6 +231,59 @@ button { font: inherit; color: inherit; cursor: pointer; }
   z-index: 2;
 }
 
+.mirror-frame {
+  display: flex;
+  flex-direction: column;
+}
+.mirror-frame__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--c-border);
+}
+.mirror-frame__title {
+  color: var(--c-accent);
+  font-size: 13px;
+  font-weight: 800;
+}
+.mirror-frame__open {
+  flex: 0 0 auto;
+  border: 1px solid var(--c-border-strong);
+  background: rgba(167, 139, 250, 0.12);
+  color: var(--c-accent);
+  border-radius: var(--r-sm);
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.mirror-frame__open:hover {
+  background: rgba(167, 139, 250, 0.2);
+}
+.mirror-frame__status {
+  border-bottom: 1px solid var(--c-border);
+  color: var(--c-text-dim);
+  font-size: 12px;
+  line-height: 1.35;
+  padding: 8px 12px;
+}
+.mirror-frame[data-state="busy"] .mirror-frame__status {
+  color: var(--c-accent);
+}
+.mirror-frame[data-state="ok"] .mirror-frame__status {
+  color: var(--c-success);
+}
+.mirror-frame[data-state="fail"] .mirror-frame__status {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.08);
+}
+.mirror-frame__content {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 14px 18px;
+}
+
 /* ───── Synthesis modal ───── */
 .synth-modal {
   position: fixed;
