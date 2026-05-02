@@ -21,6 +21,10 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     sourcemap: true,
+    // Don't wipe dist/ before each build — Chrome locks _metadata/generated_indexed_rulesets/
+    // while the extension is loaded, causing EPERM on Windows. Vite overwrites its own
+    // output files cleanly without needing to delete the whole folder.
+    emptyOutDir: false,
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'src/ui/main.html')

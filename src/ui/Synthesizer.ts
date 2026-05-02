@@ -28,6 +28,9 @@ export class Synthesizer {
     this.view.onModelChange(async (m) => {
       await this.setPreferredModel(m);
     });
+    this.view.onModelRefresh(() => {
+      void this.refreshModelList();
+    });
   }
 
   /** Cancel any in-flight synthesis. */
@@ -54,11 +57,6 @@ export class Synthesizer {
     const siteIds = uniqueSiteIds([...frames.map((f) => f.siteId), ...extraResponses.map((r) => r.siteId)]);
     this.view.show(query, siteIds);
 
-    // Kick off model list refresh in parallel — show what we have ASAP.
-    void this.refreshModelList().catch((e) => {
-      console.warn('[multiai] model list refresh failed:', e);
-    });
-
     // 1. Ask each iframe for its current answer text.
     const responses = [...extraResponses];
     for (const response of extraResponses) {
@@ -79,7 +77,8 @@ export class Synthesizer {
     this.view.setStatus('Seleccionando modelo de Ollama...');
     let model: string | null;
     try {
-      model = this.getPreferredModel() ?? (await this.client.pickDefaultModel());
+      const preferred = this.getPreferredModel();
+      model = preferred ?? (await this.client.pickDefaultModel());
     } catch (e) {
       this.view.showError(this.formatOllamaError(e));
       return;
@@ -90,24 +89,25 @@ export class Synthesizer {
       );
       return;
     }
+    this.view.setModels([{ name: model }], model);
     this.view.setActiveModel(model);
 
-    // 3. Build prompt and stream.
+    // 3. Build prompt and send exactly one non-streaming generation request.
     const prompt = buildSynthesisPrompt(query, responses);
     this.view.setPrompt(prompt);
-    this.view.setStatus(`Enviando prompt a Ollama (${model})...`);
-    console.info('[multiai] Ollama prompt chars:', prompt.length, 'model:', model);
-    let accumulated = '';
+    this.view.setStatus(`Enviando 1 prompt a Ollama (${model})...`);
+    console.info('[multiai] Ollama generate request:', {
+      model,
+      promptChars: prompt.length,
+      stream: false
+    });
     try {
-      for await (const chunk of this.client.streamGenerate(model, prompt, ctrl.signal)) {
-        if (ctrl.signal.aborted) return;
-        accumulated += chunk;
-        this.view.setStatus('Recibiendo respuesta de Ollama...');
-        this.view.setContent(accumulated);
-      }
-      if (!accumulated.trim()) {
+      const response = await this.client.generate(model, prompt, ctrl.signal);
+      if (ctrl.signal.aborted) return;
+      if (!response.trim()) {
         this.view.showError('Ollama termino la generacion pero no devolvio texto.');
       } else {
+        this.view.setContent(response);
         this.view.setStatus('Sintesis completa.');
       }
     } catch (e) {
@@ -160,12 +160,26 @@ export class Synthesizer {
 
   async refreshModelList(): Promise<void> {
     try {
+      this.view.setStatus('Consultando modelos de Ollama local...');
       const models = await this.client.listModels();
-      const current = this.getPreferredModel() ?? (await this.client.pickDefaultModel());
+      const preferred = this.getPreferredModel();
+      const current =
+        preferred && models.some((model) => model.name === preferred)
+          ? preferred
+          : models[0]?.name ?? null;
       this.view.setModels(models, current);
+      if (current && current !== preferred) {
+        await this.setPreferredModel(current);
+      }
+      this.view.setStatus(
+        models.length > 0
+          ? `Modelos actualizados (${models.length}).`
+          : 'Ollama local no devolvio modelos.'
+      );
     } catch (e) {
       console.warn('[multiai] could not list ollama models:', e);
       this.view.setModels([], null);
+      this.view.setStatus('No se pudieron consultar modelos de Ollama local.');
     }
   }
 

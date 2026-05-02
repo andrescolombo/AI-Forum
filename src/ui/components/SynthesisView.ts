@@ -13,6 +13,7 @@ export interface SynthesisView {
   hide(): void;
   setModels(models: OllamaModel[], current: string | null): void;
   onModelChange(handler: (model: string) => void): void;
+  onModelRefresh(handler: () => void): void;
   setProgress(siteId: SiteId, state: 'pending' | 'ok' | 'fail'): void;
   setActiveModel(model: string): void;
   setStatus(message: string): void;
@@ -30,6 +31,7 @@ function buildHeader(title: string, onClose: () => void): {
   root: HTMLElement;
   modelSelect: HTMLSelectElement;
   modelLabel: HTMLElement;
+  modelRefresh: HTMLButtonElement;
 } {
   const header = document.createElement('div');
   header.className = 'synth-modal__header';
@@ -49,10 +51,15 @@ function buildHeader(title: string, onClose: () => void): {
   lbl.className = 'synth-modal__model-label';
   lbl.textContent = 'Modelo:';
   const select = document.createElement('select');
-  modelRow.append(lbl, select);
+  const refresh = document.createElement('button');
+  refresh.className = 'synth-modal__model-refresh';
+  refresh.type = 'button';
+  refresh.title = 'Consultar modelos disponibles en Ollama local';
+  refresh.textContent = 'Refresh';
+  modelRow.append(lbl, select, refresh);
 
   // We need the body to also include modelRow; expose it by appending to header parent later.
-  return { root: header, modelSelect: select, modelLabel: lbl };
+  return { root: header, modelSelect: select, modelLabel: lbl, modelRefresh: refresh };
 }
 
 function buildProgressBar(): {
@@ -125,6 +132,7 @@ export class SynthesisModalView implements SynthesisView {
   private progress!: ReturnType<typeof buildProgressBar>;
   private promptBox!: ReturnType<typeof buildPromptBox>;
   private modelChangeHandler?: (model: string) => void;
+  private modelRefreshHandler?: () => void;
 
   constructor() {
     this.root = document.createElement('div');
@@ -142,6 +150,9 @@ export class SynthesisModalView implements SynthesisView {
     this.modelLabel = header.modelLabel;
     this.modelSelect.addEventListener('change', () => {
       this.modelChangeHandler?.(this.modelSelect.value);
+    });
+    header.modelRefresh.addEventListener('click', () => {
+      this.modelRefreshHandler?.();
     });
 
     const body = document.createElement('div');
@@ -202,6 +213,10 @@ export class SynthesisModalView implements SynthesisView {
     this.modelChangeHandler = handler;
   }
 
+  onModelRefresh(handler: () => void): void {
+    this.modelRefreshHandler = handler;
+  }
+
   setProgress(siteId: SiteId, state: 'pending' | 'ok' | 'fail'): void {
     this.progress.setSite(siteId, state);
   }
@@ -247,6 +262,7 @@ export class SynthesisPanelView implements SynthesisView {
   private progress!: ReturnType<typeof buildProgressBar>;
   private promptBox!: ReturnType<typeof buildPromptBox>;
   private modelChangeHandler?: (model: string) => void;
+  private modelRefreshHandler?: () => void;
   private onCloseHandler?: () => void;
 
   constructor() {
@@ -276,7 +292,15 @@ export class SynthesisPanelView implements SynthesisView {
     this.modelSelect.addEventListener('change', () => {
       this.modelChangeHandler?.(this.modelSelect.value);
     });
-    modelRow.append(lbl, this.modelSelect);
+    const refresh = document.createElement('button');
+    refresh.className = 'synth-modal__model-refresh';
+    refresh.type = 'button';
+    refresh.title = 'Consultar modelos disponibles en Ollama local';
+    refresh.textContent = 'Refresh';
+    refresh.addEventListener('click', () => {
+      this.modelRefreshHandler?.();
+    });
+    modelRow.append(lbl, this.modelSelect, refresh);
     body.append(modelRow);
 
     this.progress = buildProgressBar();
@@ -330,6 +354,10 @@ export class SynthesisPanelView implements SynthesisView {
 
   onModelChange(handler: (model: string) => void): void {
     this.modelChangeHandler = handler;
+  }
+
+  onModelRefresh(handler: () => void): void {
+    this.modelRefreshHandler = handler;
   }
 
   setProgress(siteId: SiteId, state: 'pending' | 'ok' | 'fail'): void {

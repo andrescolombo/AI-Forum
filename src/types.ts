@@ -109,7 +109,12 @@ export type DisplayMode = 'modal' | 'panel';
 export type BackgroundRequest =
   | { type: 'MULTIAI_PERPLEXITY_OPEN'; active?: boolean }
   | { type: 'MULTIAI_PERPLEXITY_SUBMIT'; query: string }
-  | { type: 'MULTIAI_PERPLEXITY_EXTRACT'; query?: string };
+  | { type: 'MULTIAI_PERPLEXITY_EXTRACT'; query?: string }
+  // Ollama proxy — routed through the service worker so the request has no
+  // Origin header and Ollama does not apply its CORS 403 check.
+  | { type: 'MULTIAI_OLLAMA_GENERATE'; model: string; prompt: string }
+  | { type: 'MULTIAI_OLLAMA_LIST_MODELS' }
+  | { type: 'MULTIAI_OLLAMA_LIST_RUNNING' };
 
 export interface BackgroundResponse {
   ok: boolean;
@@ -119,6 +124,8 @@ export interface BackgroundResponse {
   url?: string;
   error?: string;
   needsUserAction?: boolean;
+  /** Ollama list responses */
+  models?: Array<{ name: string; modified_at?: string; size?: number }>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

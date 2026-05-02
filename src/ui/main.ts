@@ -54,7 +54,6 @@ class App {
     this.searchBar.setPrefs(this.prefs);
     this.mountGrid();
 
-    void this.synthesizer.refreshModelList();
     this.searchBar.focus();
   }
 
