@@ -49,6 +49,14 @@ class App {
 
     this.synthesizer = this.createSynthesizer(this.activeView());
     this.panelView.onClose(() => this.grid.detachPanel(this.panelView.el));
+
+    // "Usar en prompt" — fills the search bar with the synthesis text
+    const reuseHandler = (text: string) => {
+      this.searchBar.setQuery(text);
+      this.searchBar.focus();
+    };
+    this.modalView.onReuseContent(reuseHandler);
+    this.panelView.onReuseContent(reuseHandler);
     window.addEventListener('message', (ev) => this.onFrameMessage(ev));
 
     this.searchBar.setPrefs(this.prefs);

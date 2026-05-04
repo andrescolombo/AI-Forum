@@ -5,8 +5,7 @@ import type { OllamaModel, SiteId } from '@/types';
 /**
  * A SynthesisView is the UI shown while/after Ollama synthesizes responses.
  * Two render modes share the same data: a centered modal, or a panel inside
- * the iframes-grid (N+1 column). Both implement this interface so the
- * orchestrator only talks to one type.
+ * the iframes-grid (N+1 column). Both implement this interface.
  */
 export interface SynthesisView {
   show(query: string, sites: SiteId[]): void;
@@ -21,11 +20,11 @@ export interface SynthesisView {
   setContent(markdown: string): void;
   appendContent(chunk: string): void;
   showError(message: string): void;
+  /** Called when user clicks "Usar en prompt" */
+  onReuseContent(handler: (text: string) => void): void;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared rendering helpers (private to this module)
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Shared helpers ───────────────────────────────────────────────────────────
 
 function buildHeader(title: string, onClose: () => void): {
   root: HTMLElement;
@@ -57,8 +56,6 @@ function buildHeader(title: string, onClose: () => void): {
   refresh.title = 'Consultar modelos disponibles en Ollama local';
   refresh.textContent = 'Refresh';
   modelRow.append(lbl, select, refresh);
-
-  // We need the body to also include modelRow; expose it by appending to header parent later.
   return { root: header, modelSelect: select, modelLabel: lbl, modelRefresh: refresh };
 }
 
@@ -70,7 +67,6 @@ function buildProgressBar(): {
   const el = document.createElement('div');
   el.className = 'synth-modal__progress';
   const pills = new Map<SiteId, HTMLElement>();
-
   return {
     el,
     setSites(sites) {
@@ -101,27 +97,106 @@ function buildPromptBox(): {
 } {
   const el = document.createElement('details');
   el.className = 'prompt-box';
-
   const summary = document.createElement('summary');
   summary.textContent = 'Ver prompt enviado a Ollama';
-
   const pre = document.createElement('pre');
   pre.className = 'prompt-box__content';
   const code = document.createElement('code');
   pre.append(code);
   el.append(summary, pre);
+  return { el, setPrompt(p) { code.textContent = p; } };
+}
 
+/**
+ * Action bar shown after synthesis completes.
+ * Buttons: Copy | Save to Obsidian | Use in prompt
+ */
+function buildActionBar(opts: {
+  onCopy:    (raw: string) => void;
+  onObsidian:(raw: string) => void;
+  onReuse:   (raw: string) => void;
+}): {
+  el: HTMLElement;
+  setRaw: (raw: string) => void;
+  show: () => void;
+} {
+  let raw = '';
+  const bar = document.createElement('div');
+  bar.className = 'synth-actions';
+  bar.style.display = 'none';
+
+  const mkBtn = (label: string, title: string, cls: string) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `synth-action-btn ${cls}`;
+    b.title = title;
+    b.textContent = label;
+    return b;
+  };
+
+  const copyBtn    = mkBtn('📋 Copiar',         'Copiar síntesis al portapapeles',       'synth-action-btn--copy');
+  const obsBtn     = mkBtn('🪨 Obsidian',        'Guardar en Obsidian',                   'synth-action-btn--obs');
+  const reuseBtn   = mkBtn('↩ Usar en prompt',  'Poner síntesis en el campo de búsqueda','synth-action-btn--reuse');
+
+  copyBtn.addEventListener('click', () => opts.onCopy(raw));
+  obsBtn.addEventListener('click',  () => opts.onObsidian(raw));
+  reuseBtn.addEventListener('click',() => opts.onReuse(raw));
+
+  bar.append(copyBtn, obsBtn, reuseBtn);
   return {
-    el,
-    setPrompt(prompt) {
-      code.textContent = prompt;
-    }
+    el: bar,
+    setRaw(r) { raw = r; },
+    show()    { bar.style.display = 'flex'; }
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Modal implementation
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Copy helper ──────────────────────────────────────────────────────────────
+
+function copyToClipboard(text: string, btn: Element): void {
+  void navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copiado';
+    setTimeout(() => { btn.textContent = orig; }, 1800);
+  }).catch(() => {
+    btn.textContent = '❌ Error';
+    setTimeout(() => { btn.textContent = '📋 Copiar'; }, 1800);
+  });
+}
+
+// ─── Obsidian helper ──────────────────────────────────────────────────────────
+
+function saveToObsidian(raw: string): void {
+  const storedVault = localStorage.getItem('multiai_obsidian_vault') ?? '';
+  const vault = prompt('Nombre de tu vault de Obsidian:', storedVault);
+  if (!vault) return;
+  localStorage.setItem('multiai_obsidian_vault', vault);
+
+  // Obsidian forbids * " \ / < > : | ? in note names — use safe date format
+  const date = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+  const name  = `MultiAI Sintesis ${date}`;
+  const url   = `obsidian://new?vault=${encodeURIComponent(vault)}&name=${encodeURIComponent(name)}&content=${encodeURIComponent(raw)}`;
+  void chrome.tabs.create({ url, active: false });
+}
+
+/** Strip markdown syntax so plain text goes into the prompt box. */
+function stripMarkdown(md: string): string {
+  return md
+    .replace(/```[\s\S]*?```/g, (m) => m.replace(/```[a-z]*/gi, '').trim()) // fenced code: keep content
+    .replace(/^#{1,6}\s+/gm, '')          // headers
+    .replace(/\*\*([^*]+)\*\*/g, '$1')    // bold
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')        // italic
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')          // inline code
+    .replace(/^[*-]\s+/gm, '')            // unordered list markers
+    .replace(/^\d+\.\s+/gm, '')           // ordered list markers
+    .replace(/^>\s*/gm, '')               // blockquotes
+    .replace(/^---+$/gm, '')              // hr
+    .replace(/\n{3,}/g, '\n\n')           // collapse excess blank lines
+    .trim();
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
 
 export class SynthesisModalView implements SynthesisView {
   private root: HTMLElement;
@@ -131,36 +206,30 @@ export class SynthesisModalView implements SynthesisView {
   private statusEl!: HTMLElement;
   private progress!: ReturnType<typeof buildProgressBar>;
   private promptBox!: ReturnType<typeof buildPromptBox>;
+  private actions!: ReturnType<typeof buildActionBar>;
   private modelChangeHandler?: (model: string) => void;
   private modelRefreshHandler?: () => void;
+  private reuseHandler?: (text: string) => void;
+  private rawContent = '';
 
   constructor() {
     this.root = document.createElement('div');
     this.root.className = 'synth-modal';
     this.root.style.display = 'none';
-    this.root.addEventListener('click', (e) => {
-      if (e.target === this.root) this.hide();
-    });
+    this.root.addEventListener('click', (e) => { if (e.target === this.root) this.hide(); });
 
     const dialog = document.createElement('div');
     dialog.className = 'synth-modal__dialog';
 
     const header = buildHeader('Síntesis Multi-AI', () => this.hide());
     this.modelSelect = header.modelSelect;
-    this.modelLabel = header.modelLabel;
-    this.modelSelect.addEventListener('change', () => {
-      this.modelChangeHandler?.(this.modelSelect.value);
-    });
-    header.modelRefresh.addEventListener('click', () => {
-      this.modelRefreshHandler?.();
-    });
+    this.modelLabel  = header.modelLabel;
+    this.modelSelect.addEventListener('change', () => this.modelChangeHandler?.(this.modelSelect.value));
+    header.modelRefresh.addEventListener('click', () => this.modelRefreshHandler?.());
 
     const body = document.createElement('div');
     body.className = 'synth-modal__body';
-
-    // model row goes in body for cleanness
-    const modelRow = this.modelLabel.parentElement!;
-    body.append(modelRow);
+    body.append(this.modelLabel.parentElement!);
 
     this.progress = buildProgressBar();
     body.append(this.progress.el);
@@ -176,71 +245,57 @@ export class SynthesisModalView implements SynthesisView {
     this.bodyContent.className = 'md';
     body.append(this.bodyContent);
 
+    this.actions = buildActionBar({
+      onCopy:    (raw) => copyToClipboard(raw, this.root.querySelector('.synth-action-btn--copy')!),
+      onObsidian:(raw) => saveToObsidian(raw),
+      onReuse:   (raw) => { this.hide(); this.reuseHandler?.(stripMarkdown(raw)); }
+    });
+    body.append(this.actions.el);
+
     dialog.append(header.root, body);
     this.root.append(dialog);
     document.body.append(this.root);
   }
 
   show(query: string, sites: SiteId[]): void {
+    this.rawContent = '';
+    this.actions.el.style.display = 'none';
     this.root.style.display = 'flex';
-    this.bodyContent.innerHTML = `<p style="color: var(--c-text-dim);"><em>Pregunta:</em> ${escapeHtml(
-      query
-    )}</p>`;
+    this.bodyContent.innerHTML = `<p style="color:var(--c-text-dim)"><em>Pregunta:</em> ${escapeHtml(query)}</p>`;
     this.statusEl.textContent = 'Capturando respuestas visibles...';
     this.progress.setSites(sites);
   }
 
-  hide(): void {
-    this.root.style.display = 'none';
-  }
+  hide(): void { this.root.style.display = 'none'; }
 
   setModels(models: OllamaModel[], current: string | null): void {
     if (models.length === 0) {
       this.modelSelect.innerHTML = '<option value="">(ningún modelo Ollama detectado)</option>';
-      this.modelSelect.disabled = true;
-      return;
+      this.modelSelect.disabled = true; return;
     }
     this.modelSelect.disabled = false;
     this.modelSelect.innerHTML = models
-      .map((m) => {
-        const sel = m.name === current ? ' selected' : '';
-        return `<option value="${escapeAttr(m.name)}"${sel}>${escapeHtml(m.name)}</option>`;
-      })
+      .map((m) => `<option value="${escapeAttr(m.name)}"${m.name === current ? ' selected' : ''}>${escapeHtml(m.name)}</option>`)
       .join('');
   }
 
-  onModelChange(handler: (model: string) => void): void {
-    this.modelChangeHandler = handler;
-  }
+  onModelChange(h: (m: string) => void): void  { this.modelChangeHandler = h; }
+  onModelRefresh(h: () => void): void           { this.modelRefreshHandler = h; }
+  onReuseContent(h: (t: string) => void): void  { this.reuseHandler = h; }
 
-  onModelRefresh(handler: () => void): void {
-    this.modelRefreshHandler = handler;
-  }
-
-  setProgress(siteId: SiteId, state: 'pending' | 'ok' | 'fail'): void {
-    this.progress.setSite(siteId, state);
-  }
-
-  setActiveModel(model: string): void {
-    this.modelLabel.textContent = `Modelo: ${model}`;
-  }
-
-  setStatus(message: string): void {
-    this.statusEl.textContent = message;
-  }
-
-  setPrompt(prompt: string): void {
-    this.promptBox.setPrompt(prompt);
-  }
+  setProgress(siteId: SiteId, state: 'pending' | 'ok' | 'fail'): void { this.progress.setSite(siteId, state); }
+  setActiveModel(model: string): void  { this.modelLabel.textContent = `Modelo: ${model}`; }
+  setStatus(message: string): void     { this.statusEl.textContent = message; }
+  setPrompt(prompt: string): void      { this.promptBox.setPrompt(prompt); }
 
   setContent(markdown: string): void {
+    this.rawContent = markdown;
+    this.actions.setRaw(markdown);
     this.bodyContent.innerHTML = renderMarkdown(markdown);
+    this.actions.show();
   }
 
-  appendContent(_chunk: string): void {
-    // Streaming append: re-render whole content for simplicity (markdown
-    // partial state is hard). Caller passes accumulated text via setContent.
-  }
+  appendContent(_chunk: string): void { /* streaming not used */ }
 
   showError(message: string): void {
     const box = document.createElement('div');
@@ -250,9 +305,7 @@ export class SynthesisModalView implements SynthesisView {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Panel implementation
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Panel ────────────────────────────────────────────────────────────────────
 
 export class SynthesisPanelView implements SynthesisView {
   readonly el: HTMLElement;
@@ -261,9 +314,11 @@ export class SynthesisPanelView implements SynthesisView {
   private statusEl!: HTMLElement;
   private progress!: ReturnType<typeof buildProgressBar>;
   private promptBox!: ReturnType<typeof buildPromptBox>;
+  private actions!: ReturnType<typeof buildActionBar>;
   private modelChangeHandler?: (model: string) => void;
   private modelRefreshHandler?: () => void;
   private onCloseHandler?: () => void;
+  private reuseHandler?: (text: string) => void;
 
   constructor() {
     this.el = document.createElement('div');
@@ -271,8 +326,7 @@ export class SynthesisPanelView implements SynthesisView {
 
     const header = document.createElement('div');
     header.className = 'synth-panel__header';
-    header.innerHTML =
-      '<span class="synth-panel__title"><span>🧠</span><span>Síntesis</span></span>';
+    header.innerHTML = '<span class="synth-panel__title"><span>🧠</span><span>Síntesis</span></span>';
     const close = document.createElement('button');
     close.className = 'synth-panel__close';
     close.type = 'button';
@@ -289,17 +343,13 @@ export class SynthesisPanelView implements SynthesisView {
     lbl.className = 'synth-modal__model-label';
     lbl.textContent = 'Modelo:';
     this.modelSelect = document.createElement('select');
-    this.modelSelect.addEventListener('change', () => {
-      this.modelChangeHandler?.(this.modelSelect.value);
-    });
+    this.modelSelect.addEventListener('change', () => this.modelChangeHandler?.(this.modelSelect.value));
     const refresh = document.createElement('button');
     refresh.className = 'synth-modal__model-refresh';
     refresh.type = 'button';
     refresh.title = 'Consultar modelos disponibles en Ollama local';
     refresh.textContent = 'Refresh';
-    refresh.addEventListener('click', () => {
-      this.modelRefreshHandler?.();
-    });
+    refresh.addEventListener('click', () => this.modelRefreshHandler?.());
     modelRow.append(lbl, this.modelSelect, refresh);
     body.append(modelRow);
 
@@ -317,72 +367,53 @@ export class SynthesisPanelView implements SynthesisView {
     this.bodyContent.className = 'md';
     body.append(this.bodyContent);
 
+    this.actions = buildActionBar({
+      onCopy:    (raw) => copyToClipboard(raw, this.el.querySelector('.synth-action-btn--copy')!),
+      onObsidian:(raw) => saveToObsidian(raw),
+      onReuse:   (raw) => this.reuseHandler?.(stripMarkdown(raw))
+    });
+    body.append(this.actions.el);
+
     this.el.append(header, body);
   }
 
-  /** Set callback for the × button. */
-  onClose(handler: () => void): void {
-    this.onCloseHandler = handler;
-  }
+  onClose(handler: () => void): void          { this.onCloseHandler = handler; }
+  onReuseContent(h: (t: string) => void): void { this.reuseHandler = h; }
 
   show(query: string, sites: SiteId[]): void {
-    this.bodyContent.innerHTML = `<p style="color: var(--c-text-dim);"><em>Pregunta:</em> ${escapeHtml(
-      query
-    )}</p>`;
+    this.actions.el.style.display = 'none';
+    this.bodyContent.innerHTML = `<p style="color:var(--c-text-dim)"><em>Pregunta:</em> ${escapeHtml(query)}</p>`;
     this.statusEl.textContent = 'Capturando respuestas visibles...';
     this.progress.setSites(sites);
   }
 
-  hide(): void {
-    // Visibility is managed by attach/detach in the grid.
-  }
+  hide(): void { /* managed by grid attach/detach */ }
 
   setModels(models: OllamaModel[], current: string | null): void {
     if (models.length === 0) {
       this.modelSelect.innerHTML = '<option value="">(sin modelos)</option>';
-      this.modelSelect.disabled = true;
-      return;
+      this.modelSelect.disabled = true; return;
     }
     this.modelSelect.disabled = false;
     this.modelSelect.innerHTML = models
-      .map((m) => {
-        const sel = m.name === current ? ' selected' : '';
-        return `<option value="${escapeAttr(m.name)}"${sel}>${escapeHtml(m.name)}</option>`;
-      })
+      .map((m) => `<option value="${escapeAttr(m.name)}"${m.name === current ? ' selected' : ''}>${escapeHtml(m.name)}</option>`)
       .join('');
   }
 
-  onModelChange(handler: (model: string) => void): void {
-    this.modelChangeHandler = handler;
-  }
-
-  onModelRefresh(handler: () => void): void {
-    this.modelRefreshHandler = handler;
-  }
-
-  setProgress(siteId: SiteId, state: 'pending' | 'ok' | 'fail'): void {
-    this.progress.setSite(siteId, state);
-  }
-
-  setActiveModel(_model: string): void {
-    // Panel is tighter; leave model name in the dropdown only.
-  }
-
-  setStatus(message: string): void {
-    this.statusEl.textContent = message;
-  }
-
-  setPrompt(prompt: string): void {
-    this.promptBox.setPrompt(prompt);
-  }
+  onModelChange(h: (m: string) => void): void  { this.modelChangeHandler = h; }
+  onModelRefresh(h: () => void): void           { this.modelRefreshHandler = h; }
+  setProgress(siteId: SiteId, s: 'pending' | 'ok' | 'fail'): void { this.progress.setSite(siteId, s); }
+  setActiveModel(_m: string): void {}
+  setStatus(message: string): void   { this.statusEl.textContent = message; }
+  setPrompt(prompt: string): void    { this.promptBox.setPrompt(prompt); }
 
   setContent(markdown: string): void {
+    this.actions.setRaw(markdown);
     this.bodyContent.innerHTML = renderMarkdown(markdown);
+    this.actions.show();
   }
 
-  appendContent(_chunk: string): void {
-    // see modal note above
-  }
+  appendContent(_chunk: string): void {}
 
   showError(message: string): void {
     const box = document.createElement('div');
@@ -395,12 +426,8 @@ export class SynthesisPanelView implements SynthesisView {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function escapeAttr(s: string): string {
-  return s.replace(/"/g, '&quot;');
+  return s.replace(/"/g,'&quot;');
 }

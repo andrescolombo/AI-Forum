@@ -534,3 +534,35 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border-radius: var(--r-sm);
   font-size: 13px;
 }
+
+/* ─── Synthesis action bar ──────────────────────────────────────────────────── */
+.synth-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 0 4px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  margin-top: 12px;
+}
+.synth-action-btn {
+  padding: 5px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  color: var(--c-text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.synth-action-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.25);
+}
+.synth-action-btn--reuse {
+  border-color: rgba(167,139,250,0.4);
+  color: #c4b5fd;
+}
+.synth-action-btn--reuse:hover {
+  background: rgba(167,139,250,0.12);
+  border-color: #a78bfa;
+}
