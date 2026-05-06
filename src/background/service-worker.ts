@@ -15,9 +15,26 @@ const PERPLEXITY_HOME = 'https://www.perplexity.ai/';
 const PERPLEXITY_SEARCH = 'https://www.perplexity.ai/search/new?q=';
 let lastPerplexityQuery = '';
 
+// Keep the action title in sync with whether the tab is open or not.
+async function syncActionTitle(): Promise<void> {
+  const existing = await chrome.tabs.query({ url: UI_URL });
+  const isOpen = existing.length > 0;
+  await chrome.action.setTitle({
+    title: isOpen ? '↺ Reiniciar Multi-AI' : 'Abrir Multi-AI'
+  });
+}
+
+chrome.tabs.onUpdated.addListener((_id, _info, tab) => {
+  if (tab.url === UI_URL) void syncActionTitle();
+});
+chrome.tabs.onRemoved.addListener(() => void syncActionTitle());
+void syncActionTitle();
+
 chrome.action.onClicked.addListener(async () => {
   const existing = await chrome.tabs.query({ url: UI_URL });
   if (existing.length > 0 && existing[0]?.id !== undefined) {
+    // Tab already open — reload it to reset all AI iframes and app state.
+    await chrome.tabs.reload(existing[0].id);
     await chrome.tabs.update(existing[0].id, { active: true });
     if (existing[0].windowId !== undefined) {
       await chrome.windows.update(existing[0].windowId, { focused: true });
@@ -25,6 +42,7 @@ chrome.action.onClicked.addListener(async () => {
     return;
   }
   await chrome.tabs.create({ url: UI_URL });
+  void syncActionTitle();
 });
 
 chrome.runtime.onMessage.addListener(

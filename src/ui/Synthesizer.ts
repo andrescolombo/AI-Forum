@@ -203,7 +203,7 @@ export class Synthesizer {
       .join('\n\n---\n\n');
     return [
       `> ⚠️ **Ollama no disponible** — se muestran las respuestas individuales sin síntesis.`,
-      `> Instalá Ollama en [ollama.com](https://ollama.com) y ejecutá \`ollama pull nemotro-3-super:cloud\` para habilitar la síntesis.`,
+      `> Instalá Ollama en [ollama.com](https://ollama.com) y ejecutá \`ollama run nemotron-3-super:cloud\` para habilitar la síntesis.`,
       '',
       sections
     ].join('\n');
