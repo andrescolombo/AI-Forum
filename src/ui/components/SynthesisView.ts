@@ -113,14 +113,16 @@ function buildPromptBox(): {
  */
 function buildActionBar(opts: {
   onCopy:    (raw: string) => void;
-  onObsidian:(raw: string) => void;
+  onObsidian:(raw: string, query: string) => void;
   onReuse:   (raw: string) => void;
 }): {
   el: HTMLElement;
   setRaw: (raw: string) => void;
+  setQuery: (query: string) => void;
   show: () => void;
 } {
   let raw = '';
+  let currentQuery = '';
   const bar = document.createElement('div');
   bar.className = 'synth-actions';
   bar.style.display = 'none';
@@ -139,13 +141,14 @@ function buildActionBar(opts: {
   const reuseBtn   = mkBtn('↩ Usar en prompt',  'Poner síntesis en el campo de búsqueda','synth-action-btn--reuse');
 
   copyBtn.addEventListener('click', () => opts.onCopy(raw));
-  obsBtn.addEventListener('click',  () => opts.onObsidian(raw));
+  obsBtn.addEventListener('click',  () => opts.onObsidian(raw, currentQuery));
   reuseBtn.addEventListener('click',() => opts.onReuse(raw));
 
   bar.append(copyBtn, obsBtn, reuseBtn);
   return {
     el: bar,
     setRaw(r) { raw = r; },
+    setQuery(q) { currentQuery = q; },
     show()    { bar.style.display = 'flex'; }
   };
 }
@@ -165,17 +168,28 @@ function copyToClipboard(text: string, btn: Element): void {
 
 // ─── Obsidian helper ──────────────────────────────────────────────────────────
 
-function saveToObsidian(raw: string): void {
+function saveToObsidian(raw: string, query: string): void {
   const storedVault = localStorage.getItem('multiai_obsidian_vault') ?? '';
   const vault = prompt('Nombre de tu vault de Obsidian:', storedVault);
   if (!vault) return;
   localStorage.setItem('multiai_obsidian_vault', vault);
 
-  // Obsidian forbids * " \ / < > : | ? in note names — use safe date format
-  const date = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
-  const name  = `MultiAI Sintesis ${date}`;
-  const url   = `obsidian://new?vault=${encodeURIComponent(vault)}&name=${encodeURIComponent(name)}&content=${encodeURIComponent(raw)}`;
-  void chrome.tabs.create({ url, active: false });
+  // Build a safe note title from the query (Obsidian forbids * " \ / < > : | ?)
+  const safeTitle = query
+    .slice(0, 60)
+    .replace(/[*"\\/<>:|?]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    || 'MultiAI Síntesis';
+
+  // `file` sets folder + name in one shot (Obsidian creates the folder if needed)
+  const filePath = `AI Summaries/${safeTitle}`;
+  const url = `obsidian://new?vault=${encodeURIComponent(vault)}&file=${encodeURIComponent(filePath)}&content=${encodeURIComponent(raw)}`;
+
+  void chrome.tabs.create({ url, active: false }).then((tab) => {
+    // Close the helper tab after Obsidian has had time to handle the URI
+    setTimeout(() => { if (tab.id !== undefined) { void chrome.tabs.remove(tab.id); } }, 2000);
+  });
 }
 
 /** Strip markdown syntax so plain text goes into the prompt box. */
@@ -211,6 +225,7 @@ export class SynthesisModalView implements SynthesisView {
   private modelRefreshHandler?: () => void;
   private reuseHandler?: (text: string) => void;
   private rawContent = '';
+  private currentQuery = '';
 
   constructor() {
     this.root = document.createElement('div');
@@ -247,7 +262,7 @@ export class SynthesisModalView implements SynthesisView {
 
     this.actions = buildActionBar({
       onCopy:    (raw) => copyToClipboard(raw, this.root.querySelector('.synth-action-btn--copy')!),
-      onObsidian:(raw) => saveToObsidian(raw),
+      onObsidian:(raw, query) => saveToObsidian(raw, query),
       onReuse:   (raw) => { this.hide(); this.reuseHandler?.(stripMarkdown(raw)); }
     });
     body.append(this.actions.el);
@@ -259,6 +274,7 @@ export class SynthesisModalView implements SynthesisView {
 
   show(query: string, sites: SiteId[]): void {
     this.rawContent = '';
+    this.currentQuery = query;
     this.actions.el.style.display = 'none';
     this.root.style.display = 'flex';
     this.bodyContent.innerHTML = `<p style="color:var(--c-text-dim)"><em>Pregunta:</em> ${escapeHtml(query)}</p>`;
@@ -291,6 +307,7 @@ export class SynthesisModalView implements SynthesisView {
   setContent(markdown: string): void {
     this.rawContent = markdown;
     this.actions.setRaw(markdown);
+    this.actions.setQuery(this.currentQuery);
     this.bodyContent.innerHTML = renderMarkdown(markdown);
     this.actions.show();
   }
@@ -319,6 +336,7 @@ export class SynthesisPanelView implements SynthesisView {
   private modelRefreshHandler?: () => void;
   private onCloseHandler?: () => void;
   private reuseHandler?: (text: string) => void;
+  private currentQuery = '';
 
   constructor() {
     this.el = document.createElement('div');
@@ -369,7 +387,7 @@ export class SynthesisPanelView implements SynthesisView {
 
     this.actions = buildActionBar({
       onCopy:    (raw) => copyToClipboard(raw, this.el.querySelector('.synth-action-btn--copy')!),
-      onObsidian:(raw) => saveToObsidian(raw),
+      onObsidian:(raw, query) => saveToObsidian(raw, query),
       onReuse:   (raw) => this.reuseHandler?.(stripMarkdown(raw))
     });
     body.append(this.actions.el);
@@ -381,6 +399,7 @@ export class SynthesisPanelView implements SynthesisView {
   onReuseContent(h: (t: string) => void): void { this.reuseHandler = h; }
 
   show(query: string, sites: SiteId[]): void {
+    this.currentQuery = query;
     this.actions.el.style.display = 'none';
     this.bodyContent.innerHTML = `<p style="color:var(--c-text-dim)"><em>Pregunta:</em> ${escapeHtml(query)}</p>`;
     this.statusEl.textContent = 'Capturando respuestas visibles...';
@@ -409,6 +428,7 @@ export class SynthesisPanelView implements SynthesisView {
 
   setContent(markdown: string): void {
     this.actions.setRaw(markdown);
+    this.actions.setQuery(this.currentQuery);
     this.bodyContent.innerHTML = renderMarkdown(markdown);
     this.actions.show();
   }

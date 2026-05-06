@@ -96,11 +96,15 @@ class App {
     this.clearSubmitTimers();
     this.perplexityResponse = null;
 
-    this.grid.submitViaUrl(query);
-    this.scheduleDomSubmissions(query);
+    // Duplicate the query in the chat field — repeating the prompt improves
+    // response quality by reinforcing the instruction for the AI models.
+    const chatQuery = `${query}\n\n${query}`;
+
+    this.grid.submitViaUrl(chatQuery);
+    this.scheduleDomSubmissions(chatQuery);
 
     if (this.prefs.enabledSites.perplexity) {
-      void this.submitPerplexity(query);
+      void this.submitPerplexity(chatQuery);
     }
   }
 
