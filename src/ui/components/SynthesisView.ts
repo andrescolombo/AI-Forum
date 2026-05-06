@@ -24,7 +24,7 @@ export interface SynthesisView {
   onReuseContent(handler: (text: string) => void): void;
 }
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
+// ─── Shared helpers ─────────────────────────────────────────────────────────────────────────────────
 
 function buildHeader(title: string, onClose: () => void): {
   root: HTMLElement;
@@ -136,9 +136,9 @@ function buildActionBar(opts: {
     return b;
   };
 
-  const copyBtn    = mkBtn('📋 Copiar',         'Copiar síntesis al portapapeles',       'synth-action-btn--copy');
-  const obsBtn     = mkBtn('🪨 Obsidian',        'Guardar en Obsidian',                   'synth-action-btn--obs');
-  const reuseBtn   = mkBtn('↩ Usar en prompt',  'Poner síntesis en el campo de búsqueda','synth-action-btn--reuse');
+  const copyBtn  = mkBtn('📋 Copiar',        'Copiar síntesis al portapapeles',       'synth-action-btn--copy');
+  const obsBtn   = mkBtn('🪹 Obsidian',       'Guardar en Obsidian',                   'synth-action-btn--obs');
+  const reuseBtn = mkBtn('↩ Usar en prompt', 'Poner síntesis en el campo de búsqueda','synth-action-btn--reuse');
 
   copyBtn.addEventListener('click', () => opts.onCopy(raw));
   obsBtn.addEventListener('click',  () => opts.onObsidian(raw, currentQuery));
@@ -153,7 +153,7 @@ function buildActionBar(opts: {
   };
 }
 
-// ─── Copy helper ──────────────────────────────────────────────────────────────
+// ─── Copy helper ─────────────────────────────────────────────────────────────────────────────────
 
 function copyToClipboard(text: string, btn: Element): void {
   void navigator.clipboard.writeText(text).then(() => {
@@ -166,7 +166,7 @@ function copyToClipboard(text: string, btn: Element): void {
   });
 }
 
-// ─── Obsidian helper ──────────────────────────────────────────────────────────
+// ─── Obsidian helper ────────────────────────────────────────────────────────────────────────────────
 
 function saveToObsidian(raw: string, query: string): void {
   const storedVault = localStorage.getItem('multiai_obsidian_vault') ?? '';
@@ -174,43 +174,45 @@ function saveToObsidian(raw: string, query: string): void {
   if (!vault) return;
   localStorage.setItem('multiai_obsidian_vault', vault);
 
-  // Build a safe note title from the query (Obsidian forbids * " \ / < > : | ?)
-  const safeTitle = query
-    .slice(0, 60)
-    .replace(/[*"\\/<>:|?]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    || 'MultiAI Síntesis';
+  // Extract the title from the first # heading in the synthesis.
+  // Ollama is instructed to always start with one; fall back to query if missing.
+  const strip = (s: string) => s.replace(/[*"\\/<>:|?]/g, '').replace(/\s+/g, ' ').trim();
+  const headingMatch = raw.match(/^#\s+(.+)$/m);
+  const safeTitle = headingMatch
+    ? strip(headingMatch[1]).slice(0, 80)
+    : (strip(query).slice(0, 60) || 'MultiAI Síntesis');
 
-  // `file` sets folder + name in one shot (Obsidian creates the folder if needed)
+  // `file` = folder/name path so Obsidian puts the note in "AI Summaries/".
+  // Tab must be active=true so Windows fires the custom protocol handler;
+  // background tabs silently skip it on Windows. We close the tab quickly
+  // after the OS has had time to pass the URI to Obsidian (~1.5 s is enough).
   const filePath = `AI Summaries/${safeTitle}`;
   const url = `obsidian://new?vault=${encodeURIComponent(vault)}&file=${encodeURIComponent(filePath)}&content=${encodeURIComponent(raw)}`;
 
-  void chrome.tabs.create({ url, active: false }).then((tab) => {
-    // Close the helper tab after Obsidian has had time to handle the URI
-    setTimeout(() => { if (tab.id !== undefined) { void chrome.tabs.remove(tab.id); } }, 2000);
+  void chrome.tabs.create({ url, active: true }).then((tab) => {
+    setTimeout(() => { if (tab.id !== undefined) { void chrome.tabs.remove(tab.id); } }, 1500);
   });
 }
 
 /** Strip markdown syntax so plain text goes into the prompt box. */
 function stripMarkdown(md: string): string {
   return md
-    .replace(/```[\s\S]*?```/g, (m) => m.replace(/```[a-z]*/gi, '').trim()) // fenced code: keep content
-    .replace(/^#{1,6}\s+/gm, '')          // headers
-    .replace(/\*\*([^*]+)\*\*/g, '$1')    // bold
+    .replace(/```[\s\S]*?```/g, (m) => m.replace(/```[a-z]*/gi, '').trim())
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/__([^_]+)__/g, '$1')
-    .replace(/\*([^*]+)\*/g, '$1')        // italic
+    .replace(/\*([^*]+)\*/g, '$1')
     .replace(/_([^_]+)_/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')          // inline code
-    .replace(/^[*-]\s+/gm, '')            // unordered list markers
-    .replace(/^\d+\.\s+/gm, '')           // ordered list markers
-    .replace(/^>\s*/gm, '')               // blockquotes
-    .replace(/^---+$/gm, '')              // hr
-    .replace(/\n{3,}/g, '\n\n')           // collapse excess blank lines
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^[*-]\s+/gm, '')
+    .replace(/^\d+\.\s+/gm, '')
+    .replace(/^>\s*/gm, '')
+    .replace(/^---+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
+// ─── Modal ────────────────────────────────────────────────────────────────────────────────────────
 
 export class SynthesisModalView implements SynthesisView {
   private root: HTMLElement;
@@ -322,7 +324,7 @@ export class SynthesisModalView implements SynthesisView {
   }
 }
 
-// ─── Panel ────────────────────────────────────────────────────────────────────
+// ─── Panel ─────────────────────────────────────────────────────────────────────────────────────────
 
 export class SynthesisPanelView implements SynthesisView {
   readonly el: HTMLElement;
@@ -443,7 +445,7 @@ export class SynthesisPanelView implements SynthesisView {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────────
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
