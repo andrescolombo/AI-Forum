@@ -130,8 +130,8 @@ class App {
     this.clearSubmitTimers();
     this.perplexityResponse = null;
 
-    // Duplicate the prompt — repeating reinforces the instruction for the models.
-    const chatQuery = `${improvedQuery}\n\n${improvedQuery}`;
+    // Send the prompt as-is without duplication
+    const chatQuery = improvedQuery;
 
     this.grid.submitViaUrl(chatQuery);
     this.scheduleDomSubmissions(chatQuery);

@@ -39,8 +39,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
   grid-template-areas:
-    "input input"
-    "sites actions";
+    "input  input"
+    "status status"
+    "sites  actions";
   gap: 8px 12px;
   padding: 8px 12px;
   border-bottom: 1px solid var(--c-border);
@@ -91,6 +92,33 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .search-bar__submit:hover { transform: translateY(-1px); }
 .search-bar__submit:active { transform: scale(0.95); }
 .search-bar__submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Prompt-improvement animation ── */
+.search-bar__status {
+  grid-area: status;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-accent);
+  letter-spacing: 0.01em;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: height 0.18s ease, opacity 0.18s ease;
+  display: flex;
+  align-items: center;
+}
+.search-bar[data-submitting="true"] .search-bar__status {
+  height: 14px;
+  opacity: 1;
+}
+.search-bar[data-submitting="true"] textarea {
+  border-color: var(--c-accent);
+  animation: prompt-glow 1.4s ease-in-out infinite;
+}
+@keyframes prompt-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0); }
+  50%       { box-shadow: 0 0 14px 3px rgba(167, 139, 250, 0.28); }
+}
 
 /* Site toggle chips */
 .site-toggle-row {
