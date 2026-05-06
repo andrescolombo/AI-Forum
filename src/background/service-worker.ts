@@ -39,6 +39,11 @@ chrome.action.onClicked.addListener(async () => {
     if (existing[0].windowId !== undefined) {
       await chrome.windows.update(existing[0].windowId, { focused: true });
     }
+    // Also reset the Perplexity background tab so it starts fresh.
+    const perplexityTab = await findPerplexityTab();
+    if (perplexityTab?.id !== undefined) {
+      await chrome.tabs.update(perplexityTab.id, { url: PERPLEXITY_HOME });
+    }
     return;
   }
   await chrome.tabs.create({ url: UI_URL });
