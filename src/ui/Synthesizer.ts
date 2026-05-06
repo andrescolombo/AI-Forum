@@ -1,4 +1,5 @@
 import { OllamaClient, OllamaError } from '@/synth/ollama';
+import { SITES } from '@/sites/registry';
 import { buildSynthesisPrompt } from '@/synth/prompt';
 import { awaitAnswer, newRequestId, postToFrame } from '@/lib/messaging';
 import type { SiteId, SiteResponse } from '@/types';
@@ -73,22 +74,23 @@ export class Synthesizer {
       return;
     }
 
-    // 2. Pick a model.
+    // 2. Try to pick a local Ollama model; fall back gracefully if unavailable.
     this.view.setStatus('Seleccionando modelo de Ollama...');
-    let model: string | null;
+    let model: string | null = null;
     try {
       const preferred = this.getPreferredModel();
       model = preferred ?? (await this.client.pickDefaultModel());
-    } catch (e) {
-      this.view.showError(this.formatOllamaError(e));
-      return;
+    } catch {
+      // Ollama not running — will fall back to plain formatting below
     }
+
     if (!model) {
-      this.view.showError(
-        'Ollama no tiene modelos disponibles. Probá con `ollama pull llama3` o usá un modelo cloud.'
-      );
+      // ── Fallback: no Ollama available ──────────────────────────────────────
+      this.view.setStatus('Ollama no disponible — mostrando respuestas sin síntesis.');
+      this.view.setContent(this.formatFallback(query, responses));
       return;
     }
+
     this.view.setModels([{ name: model }], model);
     this.view.setActiveModel(model);
 
@@ -105,14 +107,19 @@ export class Synthesizer {
       const response = await this.client.generate(model, prompt, ctrl.signal);
       if (ctrl.signal.aborted) return;
       if (!response.trim()) {
-        this.view.showError('Ollama termino la generacion pero no devolvio texto.');
+        // Empty response — also fall back to plain formatting
+        this.view.setContent(this.formatFallback(query, responses));
+        this.view.setStatus('Ollama no devolvió texto — mostrando respuestas sin síntesis.');
       } else {
         this.view.setContent(response);
         this.view.setStatus('Sintesis completa.');
       }
     } catch (e) {
       if (ctrl.signal.aborted) return;
-      this.view.showError(this.formatOllamaError(e));
+      // Generation failed — fall back instead of showing an error
+      console.warn('[multiai] Ollama generate failed, using fallback:', e);
+      this.view.setContent(this.formatFallback(query, responses));
+      this.view.setStatus('Ollama falló — mostrando respuestas sin síntesis.');
     }
   }
 
@@ -181,6 +188,25 @@ export class Synthesizer {
       this.view.setModels([], null);
       this.view.setStatus('No se pudieron consultar modelos de Ollama local.');
     }
+  }
+
+  /**
+   * When Ollama is unavailable or fails, format all collected AI responses
+   * as readable markdown so the user still gets value from the synthesis view.
+   */
+  private formatFallback(query: string, responses: SiteResponse[]): string {
+    const sections = responses
+      .map(({ siteId, text }) => {
+        const name = SITES[siteId]?.displayName ?? siteId;
+        return `## ${name}\n\n${text.trim()}`;
+      })
+      .join('\n\n---\n\n');
+    return [
+      `> ⚠️ **Ollama no disponible** — se muestran las respuestas individuales sin síntesis.`,
+      `> Instalá Ollama en [ollama.com](https://ollama.com) y ejecutá \`ollama pull nemotro-3-super:cloud\` para habilitar la síntesis.`,
+      '',
+      sections
+    ].join('\n');
   }
 
   private formatOllamaError(e: unknown): string {
