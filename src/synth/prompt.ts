@@ -4,15 +4,14 @@ import type { SiteResponse } from '@/types';
 /**
  * Build a synthesis prompt from the user's question and the AIs' responses.
  *
- * Design choices:
- *   - Every response gets a clear `## SiteName` header so the model can refer
- *     to them by source ("ChatGPT and Claude both said..., Gemini disagreed").
- *   - We cap each response by character count so the total prompt stays under
- *     ~24k chars regardless of how chatty any single AI was. Cap is dynamic
- *     by site count.
- *   - Output language: Spanish, because the user is es-AR and ChatGPT/Claude
- *     usually respond in the language of the question — but Ollama with a
- *     mixed-language prompt sometimes drifts to English. Force it.
+ * Output format mirrors the user's Obsidian note style:
+ *   ---
+ *   category: AI
+ *   tags: [ai-synthesis, tag1, tag2]
+ *   ---
+ *   # Título
+ *
+ *   (síntesis)
  */
 
 const TARGET_TOTAL_CHARS = 22000;
@@ -37,20 +36,57 @@ export function buildSynthesisPrompt(query: string, responses: SiteResponse[]): 
   return [
     'Sos un asistente que sintetiza respuestas de varios modelos de IA en una sola respuesta clara, en español.',
     '',
-    'Te paso la pregunta original del usuario y las respuestas que dieron N IAs distintas. Tu tarea:',
+    'Tu respuesta DEBE seguir EXACTAMENTE esta estructura (sin agregar nada antes del frontmatter):',
     '',
-    '1. Identificá los puntos en los que coinciden — esos son los más confiables.',
-    '2. Marcá las contradicciones o discrepancias importantes (mencionando qué AI dijo qué).',
-    '3. Combiná las mejores partes en una respuesta unificada y bien estructurada.',
-    '4. Si alguna AI agrega algo único y valioso, conservalo y atribuilo brevemente.',
-    '5. Si las respuestas están vacías o cortadas (porque las pediste antes de que terminaran), decilo al principio en una línea.',
+    '---',
+    'category: AI',
+    'tags: [ai-synthesis, tag2, tag3, tag4]',
+    '---',
+    '# Título descriptivo y breve',
     '',
-    'Formato: Markdown. Conciso pero completo. Nada de "Como inteligencia artificial..." y nada de pedir disculpas.',
+    '(contenido de la síntesis en Markdown)',
+    '',
+    'Reglas para el frontmatter:',
+    '- "category" siempre es "AI".',
+    '- El primer tag SIEMPRE es "ai-synthesis".',
+    '- Agregá entre 2 y 5 tags adicionales que describan el tema. Palabras simples, minúsculas, sin espacios (guión medio si hace falta).',
+    '',
+    'Reglas para el contenido:',
+    '- Identificá los puntos en los que coinciden las IAs — esos son los más confiables.',
+    '- Marcá las contradicciones o discrepancias importantes (mencionando qué AI dijo qué).',
+    '- Combiná las mejores partes en una respuesta unificada y bien estructurada.',
+    '- Si alguna AI agrega algo único y valioso, conservalo y atribuílo brevemente.',
+    '- Si las respuestas están vacías o cortadas, mencionalo al principio.',
+    '- Nada de "Como inteligencia artificial..." ni disculpas.',
     '',
     `# Pregunta del usuario\n\n${query}`,
     '',
     `# Respuestas de las IAs\n\n${sections}`,
     '',
     '# Tu síntesis'
+  ].join('\n');
+}
+
+/**
+ * Prompt sent to the local judge model to improve the user's raw query
+ * using prompt-engineering best practices.
+ * The model must return ONLY the improved prompt — no preamble, no quotes.
+ */
+export function buildPromptImprovementPrompt(query: string): string {
+  return [
+    'Sos un experto en ingeniería de prompts.',
+    'Tu única tarea es tomar la pregunta del usuario y reescribirla como un prompt más efectivo para modelos de lenguaje grandes.',
+    '',
+    'Reglas estrictas:',
+    '- Sé específico, claro y bien estructurado.',
+    '- Añadí contexto útil si le falta.',
+    '- Pedí el formato de respuesta ideal cuando sea relevante.',
+    '- Si la pregunta es técnica, especificá el nivel de detalle esperado.',
+    '- Conservá el idioma original de la pregunta.',
+    '- Devolvé ÚNICAMENTE el prompt mejorado — sin explicaciones, sin comillas, sin preámbulos, sin texto adicional.',
+    '',
+    `Pregunta original: ${query}`,
+    '',
+    'Prompt mejorado:'
   ].join('\n');
 }

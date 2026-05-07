@@ -13,6 +13,9 @@ import type { FrameRef } from './components/IframesGrid';
  *   2. Show progress pills as answers arrive.
  *   3. Pick / load a model.
  *   4. Stream the synthesis from Ollama and render it as markdown.
+ *
+ * After a run completes, lastResponses is kept so the user can re-synthesize
+ * with a subset of AIs without re-fetching the iframes.
  */
 
 const EXTRACT_GRACE_MS = 4500;
@@ -20,6 +23,7 @@ const EXTRACT_GRACE_MS = 4500;
 export class Synthesizer {
   private client = new OllamaClient();
   private currentAbort: AbortController | null = null;
+  private lastResponses: SiteResponse[] = [];
 
   constructor(
     private view: SynthesisView,
@@ -66,6 +70,48 @@ export class Synthesizer {
     responses.push(...(await this.collectAnswers(frames, ctrl.signal)));
 
     if (ctrl.signal.aborted) return;
+
+    // Store for potential re-synthesis
+    this.lastResponses = responses;
+
+    await this.synthesize(query, responses, ctrl);
+  }
+
+  /**
+   * Re-synthesize using only the responses from the previous run that match
+   * the given siteIds. Called when the user toggles pills and clicks
+   * "Re-sintetizar".
+   */
+  async rerun(selectedIds: SiteId[]): Promise<void> {
+    if (this.lastResponses.length === 0) return;
+    this.cancel();
+    const ctrl = new AbortController();
+    this.currentAbort = ctrl;
+
+    const filtered = this.lastResponses.filter((r) => selectedIds.includes(r.siteId));
+    if (filtered.length === 0) return;
+
+    // Re-show with the same query — get it from last status (we use a separate query param)
+    const query = this.lastQuery;
+    const siteIds = filtered.map((r) => r.siteId);
+    this.view.show(query, siteIds);
+
+    // Mark all as ok instantly since we already have the data
+    for (const r of filtered) {
+      this.view.setProgress(r.siteId, 'ok');
+    }
+
+    await this.synthesize(query, filtered, ctrl);
+  }
+
+  private lastQuery = '';
+
+  private async synthesize(
+    query: string,
+    responses: SiteResponse[],
+    ctrl: AbortController
+  ): Promise<void> {
+    this.lastQuery = query;
 
     if (responses.length === 0) {
       this.view.showError(

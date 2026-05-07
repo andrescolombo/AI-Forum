@@ -18,6 +18,9 @@ export class SearchBar {
   private synthBtn!: HTMLButtonElement;
   private modeBtn!: HTMLButtonElement;
   private chips = new Map<SiteId, HTMLButtonElement>();
+  private statusEl!: HTMLElement;
+  private improveCheckbox!: HTMLInputElement;
+  private dotsTimer: number | null = null;
 
   constructor(private h: SearchBarHandlers) {
     this.el = this.build();
@@ -40,6 +43,28 @@ export class SearchBar {
     this.synthBtn.dataset.running = String(running);
   }
 
+  setSubmitting(running: boolean): void {
+    this.submitBtn.disabled    = running;
+    this.textarea.disabled     = running;
+    this.el.dataset.submitting = String(running);
+    if (running) {
+      this.submitBtn.title = 'Mejorando prompt...';
+      let dots = 0;
+      this.statusEl.textContent = '✦ Mejorando prompt con IA local';
+      this.dotsTimer = window.setInterval(() => {
+        dots = (dots + 1) % 4;
+        this.statusEl.textContent = '✦ Mejorando prompt con IA local' + '.'.repeat(dots);
+      }, 420);
+    } else {
+      this.submitBtn.title = 'Enviar a todas las IAs (Enter)';
+      if (this.dotsTimer !== null) {
+        clearInterval(this.dotsTimer);
+        this.dotsTimer = null;
+      }
+      this.statusEl.textContent = '';
+    }
+  }
+
   setQuery(value: string): void {
     this.textarea.value = value;
     this.autoResize();
@@ -47,6 +72,11 @@ export class SearchBar {
 
   focus(): void {
     this.textarea.focus();
+  }
+
+  /** Whether the user wants the judge AI to improve the prompt before sending. */
+  get improvePrompt(): boolean {
+    return this.improveCheckbox.checked;
   }
 
   private build(): HTMLElement {
@@ -91,6 +121,9 @@ export class SearchBar {
     this.submitBtn.addEventListener('click', () => this.fire());
     inputWrap.append(this.textarea, this.submitBtn);
 
+    this.statusEl = document.createElement('div');
+    this.statusEl.className = 'search-bar__status';
+
     const synthGroup = document.createElement('div');
     synthGroup.className = 'synth-group';
 
@@ -107,8 +140,19 @@ export class SearchBar {
     this.modeBtn.textContent = 'Modal';
     this.modeBtn.addEventListener('click', () => this.h.onToggleMode());
 
-    synthGroup.append(this.synthBtn, this.modeBtn);
-    root.append(chipRow, inputWrap, synthGroup);
+    // ── Improve-prompt checkbox ──────────────────────────────────────────────
+    const improveLabel = document.createElement('label');
+    improveLabel.className = 'improve-toggle';
+    improveLabel.title = 'Reescribir el prompt con IA antes de enviarlo';
+    this.improveCheckbox = document.createElement('input');
+    this.improveCheckbox.type = 'checkbox';
+    this.improveCheckbox.checked = true;
+    const improveSpan = document.createElement('span');
+    improveSpan.textContent = '✦ Mejorar prompt';
+    improveLabel.append(this.improveCheckbox, improveSpan);
+
+    synthGroup.append(improveLabel, this.synthBtn, this.modeBtn);
+    root.append(chipRow, inputWrap, this.statusEl, synthGroup);
     return root;
   }
 

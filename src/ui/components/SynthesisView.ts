@@ -22,9 +22,11 @@ export interface SynthesisView {
   showError(message: string): void;
   /** Called when user clicks "Usar en prompt" */
   onReuseContent(handler: (text: string) => void): void;
+  /** Called when user clicks "Re-sintetizar" after toggling site selection */
+  onResynth(handler: (selected: SiteId[]) => void): void;
 }
 
-// ─── Shared helpers ─────────────────────────────────────────────────────────────────────────────────
+// ─── Shared helpers ────────────────────────────────────────────────────────────
 
 function buildHeader(title: string, onClose: () => void): {
   root: HTMLElement;
@@ -59,26 +61,74 @@ function buildHeader(title: string, onClose: () => void): {
   return { root: header, modelSelect: select, modelLabel: lbl, modelRefresh: refresh };
 }
 
+/**
+ * Progress bar with selectable site pills.
+ *
+ * While synthesis is running, pills show ⌛/✅/⚠️ states.
+ * Once enableSelection() is called (after synthesis completes), each ✅ pill
+ * becomes a toggle: click to exclude/include it from a re-synthesis.
+ * A "Re-sintetizar" button appears so the user can run again with the subset.
+ */
 function buildProgressBar(): {
   el: HTMLElement;
   setSite: (siteId: SiteId, state: 'pending' | 'ok' | 'fail') => void;
   setSites: (sites: SiteId[]) => void;
+  enableSelection: (handler: (selected: SiteId[]) => void) => void;
+  disableSelection: () => void;
 } {
-  const el = document.createElement('div');
-  el.className = 'synth-modal__progress';
+  const wrap = document.createElement('div');
+  wrap.className = 'synth-progress-wrap';
+
+  const pillRow = document.createElement('div');
+  pillRow.className = 'synth-modal__progress';
+
+  const resynthBtn = document.createElement('button');
+  resynthBtn.className = 'synth-resynth-btn';
+  resynthBtn.type = 'button';
+  resynthBtn.textContent = '🔄 Re-sintetizar';
+  resynthBtn.style.display = 'none';
+
+  wrap.append(pillRow, resynthBtn);
+
   const pills = new Map<SiteId, HTMLElement>();
+  const okSites = new Set<SiteId>();
+  const excluded = new Set<SiteId>();
+  let selectionEnabled = false;
+  let resynthHandler: ((selected: SiteId[]) => void) | null = null;
+
+  function getSelected(): SiteId[] {
+    return [...okSites].filter((id) => !excluded.has(id));
+  }
+
+  function updateResynthBtn(): void {
+    const sel = getSelected();
+    resynthBtn.disabled = sel.length === 0;
+    resynthBtn.title = sel.length === 0
+      ? 'Seleccioná al menos una IA'
+      : `Re-sintetizar con: ${sel.map((id) => SITES[id].displayName).join(', ')}`;
+  }
+
+  resynthBtn.addEventListener('click', () => {
+    resynthHandler?.(getSelected());
+  });
+
   return {
-    el,
+    el: wrap,
     setSites(sites) {
-      el.replaceChildren();
+      pillRow.replaceChildren();
       pills.clear();
+      okSites.clear();
+      excluded.clear();
+      selectionEnabled = false;
+      resynthBtn.style.display = 'none';
       sites.forEach((id) => {
         const pill = document.createElement('span');
         pill.className = 'synth-modal__pill';
         pill.dataset.state = 'pending';
+        pill.dataset.excluded = 'false';
         pill.textContent = `⌛ ${SITES[id].displayName}`;
         pills.set(id, pill);
-        el.append(pill);
+        pillRow.append(pill);
       });
     },
     setSite(siteId, state) {
@@ -86,7 +136,58 @@ function buildProgressBar(): {
       if (!pill) return;
       pill.dataset.state = state;
       const name = SITES[siteId].displayName;
-      pill.textContent = state === 'ok' ? `✅ ${name}` : state === 'fail' ? `⚠️ ${name}` : `⌛ ${name}`;
+      if (state === 'ok') {
+        okSites.add(siteId);
+        pill.textContent = selectionEnabled ? `✅ ${name}` : `✅ ${name}`;
+        if (selectionEnabled) pill.dataset.selectable = 'true';
+      } else if (state === 'fail') {
+        pill.textContent = `⚠️ ${name}`;
+      } else {
+        pill.textContent = `⌛ ${name}`;
+      }
+    },
+    enableSelection(handler) {
+      selectionEnabled = true;
+      resynthHandler = handler;
+      resynthBtn.style.display = '';
+      pills.forEach((pill, id) => {
+        if (!okSites.has(id)) return; // can't toggle failed sites
+        pill.dataset.selectable = 'true';
+        pill.dataset.excluded = 'false';
+        pill.title = 'Clic para excluir de la re-síntesis';
+        // Remove old listeners by replacing
+        const newPill = pill.cloneNode(true) as HTMLElement;
+        newPill.addEventListener('click', () => {
+          const isExcluded = newPill.dataset.excluded === 'true';
+          const name = SITES[id].displayName;
+          if (isExcluded) {
+            excluded.delete(id);
+            newPill.dataset.excluded = 'false';
+            newPill.textContent = `✅ ${name}`;
+            newPill.title = 'Clic para excluir de la re-síntesis';
+          } else {
+            excluded.add(id);
+            newPill.dataset.excluded = 'true';
+            newPill.textContent = `✖ ${name}`;
+            newPill.title = 'Clic para incluir en la re-síntesis';
+          }
+          // Update our map reference
+          pills.set(id, newPill);
+          updateResynthBtn();
+        });
+        pill.replaceWith(newPill);
+        pills.set(id, newPill);
+      });
+      updateResynthBtn();
+    },
+    disableSelection() {
+      selectionEnabled = false;
+      resynthBtn.style.display = 'none';
+      excluded.clear();
+      pills.forEach((pill, id) => {
+        delete pill.dataset.selectable;
+        pill.title = '';
+      });
     }
   };
 }
@@ -113,13 +214,14 @@ function buildPromptBox(): {
  */
 function buildActionBar(opts: {
   onCopy:    (raw: string) => void;
-  onObsidian:(raw: string, query: string) => void;
+  onObsidian:(raw: string, query: string, shiftKey?: boolean) => void;
   onReuse:   (raw: string) => void;
 }): {
   el: HTMLElement;
   setRaw: (raw: string) => void;
   setQuery: (query: string) => void;
   show: () => void;
+  hide: () => void;
 } {
   let raw = '';
   let currentQuery = '';
@@ -141,7 +243,7 @@ function buildActionBar(opts: {
   const reuseBtn = mkBtn('↩ Usar en prompt', 'Poner síntesis en el campo de búsqueda','synth-action-btn--reuse');
 
   copyBtn.addEventListener('click', () => opts.onCopy(raw));
-  obsBtn.addEventListener('click',  () => opts.onObsidian(raw, currentQuery));
+  obsBtn.addEventListener('click',  (e) => opts.onObsidian(raw, currentQuery, e.shiftKey));
   reuseBtn.addEventListener('click',() => opts.onReuse(raw));
 
   bar.append(copyBtn, obsBtn, reuseBtn);
@@ -149,11 +251,12 @@ function buildActionBar(opts: {
     el: bar,
     setRaw(r) { raw = r; },
     setQuery(q) { currentQuery = q; },
-    show()    { bar.style.display = 'flex'; }
+    show()    { bar.style.display = 'flex'; },
+    hide()    { bar.style.display = 'none'; }
   };
 }
 
-// ─── Copy helper ─────────────────────────────────────────────────────────────────────────────────
+// ─── Copy helper ──────────────────────────────────────────────────────────────
 
 function copyToClipboard(text: string, btn: Element): void {
   void navigator.clipboard.writeText(text).then(() => {
@@ -166,28 +269,37 @@ function copyToClipboard(text: string, btn: Element): void {
   });
 }
 
-// ─── Obsidian helper ────────────────────────────────────────────────────────────────────────────────
+// ─── Obsidian helper ──────────────────────────────────────────────────────────
 
-function saveToObsidian(raw: string, query: string): void {
+function saveToObsidian(raw: string, query: string, shiftKey = false): void {
+  // ── Vault: use stored value; Shift+click to change it ──────────────────────
   const storedVault = localStorage.getItem('multiai_obsidian_vault') ?? '';
-  const vault = prompt('Nombre de tu vault de Obsidian:', storedVault);
-  if (!vault) return;
-  localStorage.setItem('multiai_obsidian_vault', vault);
+  let vault = storedVault;
+  if (!vault || shiftKey) {
+    const entered = prompt(
+      shiftKey ? 'Cambiar vault de Obsidian:' : 'Nombre de tu vault de Obsidian:',
+      storedVault
+    );
+    if (!entered) return;
+    vault = entered;
+    localStorage.setItem('multiai_obsidian_vault', vault);
+  }
 
-  // Extract the title from the first # heading in the synthesis.
-  // Ollama is instructed to always start with one; fall back to query if missing.
+  // ── Title: extract from first # heading (after optional YAML frontmatter) ──
   const strip = (s: string) => s.replace(/[*"\\/<>:|?]/g, '').replace(/\s+/g, ' ').trim();
   const headingMatch = raw.match(/^#\s+(.+)$/m);
   const safeTitle = headingMatch
     ? strip(headingMatch[1]).slice(0, 80)
     : (strip(query).slice(0, 60) || 'MultiAI Síntesis');
 
-  // `file` = folder/name path so Obsidian puts the note in "AI Summaries/".
-  // Tab must be active=true so Windows fires the custom protocol handler;
-  // background tabs silently skip it on Windows. We close the tab quickly
-  // after the OS has had time to pass the URI to Obsidian (~1.5 s is enough).
+  // ── Content: strip the `# Title` line — Obsidian uses the filename as title.
+  // Keep any YAML frontmatter (tags) which appears before the heading.
+  const contentToSave = raw.replace(/^#\s+.+\n?/m, '').trimStart();
+
+  // ── Open URI: must be active=true on Windows for the OS to fire the handler.
+  // Close the tab quickly after Obsidian receives it.
   const filePath = `AI Summaries/${safeTitle}`;
-  const url = `obsidian://new?vault=${encodeURIComponent(vault)}&file=${encodeURIComponent(filePath)}&content=${encodeURIComponent(raw)}`;
+  const url = `obsidian://new?vault=${encodeURIComponent(vault)}&file=${encodeURIComponent(filePath)}&content=${encodeURIComponent(contentToSave)}`;
 
   void chrome.tabs.create({ url, active: true }).then((tab) => {
     setTimeout(() => { if (tab.id !== undefined) { void chrome.tabs.remove(tab.id); } }, 1500);
@@ -212,7 +324,7 @@ function stripMarkdown(md: string): string {
     .trim();
 }
 
-// ─── Modal ────────────────────────────────────────────────────────────────────────────────────────
+// ─── Modal ────────────────────────────────────────────────────────────────────
 
 export class SynthesisModalView implements SynthesisView {
   private root: HTMLElement;
@@ -226,6 +338,7 @@ export class SynthesisModalView implements SynthesisView {
   private modelChangeHandler?: (model: string) => void;
   private modelRefreshHandler?: () => void;
   private reuseHandler?: (text: string) => void;
+  private resynthHandler?: (selected: SiteId[]) => void;
   private rawContent = '';
   private currentQuery = '';
 
@@ -264,7 +377,7 @@ export class SynthesisModalView implements SynthesisView {
 
     this.actions = buildActionBar({
       onCopy:    (raw) => copyToClipboard(raw, this.root.querySelector('.synth-action-btn--copy')!),
-      onObsidian:(raw, query) => saveToObsidian(raw, query),
+      onObsidian:(raw, query, shiftKey) => saveToObsidian(raw, query, shiftKey),
       onReuse:   (raw) => { this.hide(); this.reuseHandler?.(stripMarkdown(raw)); }
     });
     body.append(this.actions.el);
@@ -277,7 +390,8 @@ export class SynthesisModalView implements SynthesisView {
   show(query: string, sites: SiteId[]): void {
     this.rawContent = '';
     this.currentQuery = query;
-    this.actions.el.style.display = 'none';
+    this.actions.hide();
+    this.progress.disableSelection();
     this.root.style.display = 'flex';
     this.bodyContent.innerHTML = `<p style="color:var(--c-text-dim)"><em>Pregunta:</em> ${escapeHtml(query)}</p>`;
     this.statusEl.textContent = 'Capturando respuestas visibles...';
@@ -300,6 +414,7 @@ export class SynthesisModalView implements SynthesisView {
   onModelChange(h: (m: string) => void): void  { this.modelChangeHandler = h; }
   onModelRefresh(h: () => void): void           { this.modelRefreshHandler = h; }
   onReuseContent(h: (t: string) => void): void  { this.reuseHandler = h; }
+  onResynth(h: (selected: SiteId[]) => void): void { this.resynthHandler = h; }
 
   setProgress(siteId: SiteId, state: 'pending' | 'ok' | 'fail'): void { this.progress.setSite(siteId, state); }
   setActiveModel(model: string): void  { this.modelLabel.textContent = `Modelo: ${model}`; }
@@ -312,6 +427,8 @@ export class SynthesisModalView implements SynthesisView {
     this.actions.setQuery(this.currentQuery);
     this.bodyContent.innerHTML = renderMarkdown(markdown);
     this.actions.show();
+    // Enable pill selection for re-synthesis
+    this.progress.enableSelection((selected) => this.resynthHandler?.(selected));
   }
 
   appendContent(_chunk: string): void { /* streaming not used */ }
@@ -324,7 +441,7 @@ export class SynthesisModalView implements SynthesisView {
   }
 }
 
-// ─── Panel ─────────────────────────────────────────────────────────────────────────────────────────
+// ─── Panel ────────────────────────────────────────────────────────────────────
 
 export class SynthesisPanelView implements SynthesisView {
   readonly el: HTMLElement;
@@ -338,6 +455,7 @@ export class SynthesisPanelView implements SynthesisView {
   private modelRefreshHandler?: () => void;
   private onCloseHandler?: () => void;
   private reuseHandler?: (text: string) => void;
+  private resynthHandler?: (selected: SiteId[]) => void;
   private currentQuery = '';
 
   constructor() {
@@ -389,7 +507,7 @@ export class SynthesisPanelView implements SynthesisView {
 
     this.actions = buildActionBar({
       onCopy:    (raw) => copyToClipboard(raw, this.el.querySelector('.synth-action-btn--copy')!),
-      onObsidian:(raw, query) => saveToObsidian(raw, query),
+      onObsidian:(raw, query, shiftKey) => saveToObsidian(raw, query, shiftKey),
       onReuse:   (raw) => this.reuseHandler?.(stripMarkdown(raw))
     });
     body.append(this.actions.el);
@@ -399,10 +517,12 @@ export class SynthesisPanelView implements SynthesisView {
 
   onClose(handler: () => void): void          { this.onCloseHandler = handler; }
   onReuseContent(h: (t: string) => void): void { this.reuseHandler = h; }
+  onResynth(h: (selected: SiteId[]) => void): void { this.resynthHandler = h; }
 
   show(query: string, sites: SiteId[]): void {
     this.currentQuery = query;
-    this.actions.el.style.display = 'none';
+    this.actions.hide();
+    this.progress.disableSelection();
     this.bodyContent.innerHTML = `<p style="color:var(--c-text-dim)"><em>Pregunta:</em> ${escapeHtml(query)}</p>`;
     this.statusEl.textContent = 'Capturando respuestas visibles...';
     this.progress.setSites(sites);
@@ -433,6 +553,8 @@ export class SynthesisPanelView implements SynthesisView {
     this.actions.setQuery(this.currentQuery);
     this.bodyContent.innerHTML = renderMarkdown(markdown);
     this.actions.show();
+    // Enable pill selection for re-synthesis
+    this.progress.enableSelection((selected) => this.resynthHandler?.(selected));
   }
 
   appendContent(_chunk: string): void {}
@@ -445,7 +567,7 @@ export class SynthesisPanelView implements SynthesisView {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

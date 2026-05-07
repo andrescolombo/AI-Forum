@@ -7,3 +7,5 @@ vite.config.ts.timestamp-*.mjs
 .idea/
 .env
 .env.local
+key.pem
+multi-ai-v2.crx

@@ -60,11 +60,17 @@ class App {
     };
     this.modalView.onReuseContent(reuseHandler);
     this.panelView.onReuseContent(reuseHandler);
+
+    // Re-synthesize with a subset of AIs (user toggled pills)
+    const resynthHandler = (selected: SiteId[]) => { void this.synthesizer.rerun(selected); };
+    this.modalView.onResynth(resynthHandler);
+    this.panelView.onResynth(resynthHandler);
     window.addEventListener('message', (ev) => this.onFrameMessage(ev));
 
     this.searchBar.setPrefs(this.prefs);
     this.mountGrid();
 
+    // Always focus the textarea on load
     this.searchBar.focus();
   }
 
@@ -96,33 +102,37 @@ class App {
 
   /**
    * Submit flow:
-   *   1. Send the raw query to the local Ollama "judge" model to rewrite it
-   *      using prompt-engineering best practices.
+   *   1. If "Mejorar prompt" is checked, send the raw query to the local Ollama
+   *      "judge" model to rewrite it using prompt-engineering best practices.
    *   2. Show the improved prompt back in the search bar so the user sees it.
-   *   3. Send the improved prompt (doubled) to every AI chat.
-   * If Ollama is unavailable or fails, falls back to the original query.
+   *   3. Send the (possibly improved) prompt to every AI chat.
+   * If Ollama is unavailable or the checkbox is unchecked, the original query
+   * is sent as-is.
    */
   private async onSubmit(query: string): Promise<void> {
-    // ── Step 1: improve the query with the judge AI ───────────────────────────
-    this.searchBar.setSubmitting(true);
     let improvedQuery = query;
-    try {
-      const model =
-        this.prefs.preferredModel ?? (await this.ollamaClient.pickDefaultModel());
-      if (model) {
-        const prompt = buildPromptImprovementPrompt(query);
-        const result = await this.ollamaClient.generate(model, prompt);
-        if (result.trim()) improvedQuery = result.trim();
-      }
-    } catch (e) {
-      console.warn('[multiai] prompt improvement failed — using original query:', e);
-    } finally {
-      this.searchBar.setSubmitting(false);
-    }
 
-    // Show the improved query in the search bar
-    if (improvedQuery !== query) {
-      this.searchBar.setQuery(improvedQuery);
+    // ── Step 1: optionally improve the query with the judge AI ───────────────
+    if (this.searchBar.improvePrompt) {
+      this.searchBar.setSubmitting(true);
+      try {
+        const model =
+          this.prefs.preferredModel ?? (await this.ollamaClient.pickDefaultModel());
+        if (model) {
+          const prompt = buildPromptImprovementPrompt(query);
+          const result = await this.ollamaClient.generate(model, prompt);
+          if (result.trim()) improvedQuery = result.trim();
+        }
+      } catch (e) {
+        console.warn('[multiai] prompt improvement failed — using original query:', e);
+      } finally {
+        this.searchBar.setSubmitting(false);
+      }
+
+      // Show the improved query in the search bar
+      if (improvedQuery !== query) {
+        this.searchBar.setQuery(improvedQuery);
+      }
     }
 
     // ── Step 2: send to all AI chats ──────────────────────────────────────────
@@ -130,14 +140,11 @@ class App {
     this.clearSubmitTimers();
     this.perplexityResponse = null;
 
-    // Send the prompt as-is without duplication
-    const chatQuery = improvedQuery;
-
-    this.grid.submitViaUrl(chatQuery);
-    this.scheduleDomSubmissions(chatQuery);
+    this.grid.submitViaUrl(improvedQuery);
+    this.scheduleDomSubmissions(improvedQuery);
 
     if (this.prefs.enabledSites.perplexity) {
-      void this.submitPerplexity(chatQuery);
+      void this.submitPerplexity(improvedQuery);
     }
   }
 
