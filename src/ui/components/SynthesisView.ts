@@ -301,9 +301,15 @@ function saveToObsidian(raw: string, query: string, shiftKey = false): void {
   const filePath = `AI Summaries/${safeTitle}`;
   const url = `obsidian://new?vault=${encodeURIComponent(vault)}&file=${encodeURIComponent(filePath)}&content=${encodeURIComponent(contentToSave)}`;
 
-  void chrome.tabs.create({ url, active: true }).then((tab) => {
-    setTimeout(() => { if (tab.id !== undefined) { void chrome.tabs.remove(tab.id); } }, 1500);
-  });
+  // Trigger the protocol handler via an anchor click, exactly like clicking an
+  // obsidian:// link on a webpage. This lets Chrome remember the "Always allow"
+  // decision properly — unlike chrome.tabs.create which treats every call as new.
+  const a = document.createElement('a');
+  a.href = url;
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 /** Strip markdown syntax so plain text goes into the prompt box. */
