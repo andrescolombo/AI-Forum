@@ -35,8 +35,8 @@ export class SearchBar {
     this.modeBtn.textContent = prefs.displayMode === 'panel' ? 'Panel' : 'Modal';
     this.modeBtn.title =
       prefs.displayMode === 'panel'
-        ? 'La sintesis aparece como cuarto panel. Clic para cambiar a modal.'
-        : 'La sintesis aparece en modal. Clic para cambiar a cuarto panel.';
+        ? 'Synthesis appears as a fourth panel. Click to switch to modal.'
+        : 'Synthesis appears in a modal. Click to switch to a fourth panel.';
   }
 
   setSynthRunning(running: boolean): void {
@@ -48,15 +48,15 @@ export class SearchBar {
     this.textarea.disabled     = running;
     this.el.dataset.submitting = String(running);
     if (running) {
-      this.submitBtn.title = 'Mejorando prompt...';
+      this.submitBtn.title = 'Improving prompt...';
       let dots = 0;
-      this.statusEl.textContent = '✦ Mejorando prompt con IA local';
+      this.statusEl.textContent = '✦ Improving prompt with local AI';
       this.dotsTimer = window.setInterval(() => {
         dots = (dots + 1) % 4;
-        this.statusEl.textContent = '✦ Mejorando prompt con IA local' + '.'.repeat(dots);
+        this.statusEl.textContent = '✦ Improving prompt with local AI' + '.'.repeat(dots);
       }, 420);
     } else {
-      this.submitBtn.title = 'Enviar a todas las IAs (Enter)';
+      this.submitBtn.title = 'Send to all AIs (Enter)';
       if (this.dotsTimer !== null) {
         clearInterval(this.dotsTimer);
         this.dotsTimer = null;
@@ -103,7 +103,7 @@ export class SearchBar {
     const inputWrap = document.createElement('div');
     inputWrap.className = 'search-bar__input-wrap';
     this.textarea = document.createElement('textarea');
-    this.textarea.placeholder = 'Pregunta para todas las IAs...';
+    this.textarea.placeholder = 'Question for all AIs...';
     this.textarea.rows = 1;
     this.textarea.addEventListener('input', () => this.autoResize());
     this.textarea.addEventListener('keydown', (e) => {
@@ -116,7 +116,7 @@ export class SearchBar {
     this.submitBtn = document.createElement('button');
     this.submitBtn.className = 'search-bar__submit';
     this.submitBtn.type = 'button';
-    this.submitBtn.title = 'Enviar a todas las IAs (Enter)';
+    this.submitBtn.title = 'Send to all AIs (Enter)';
     this.submitBtn.innerHTML = ARROW_SVG;
     this.submitBtn.addEventListener('click', () => this.fire());
     inputWrap.append(this.textarea, this.submitBtn);
@@ -130,8 +130,8 @@ export class SearchBar {
     this.synthBtn = document.createElement('button');
     this.synthBtn.className = 'synth-btn';
     this.synthBtn.type = 'button';
-    this.synthBtn.title = 'Sintetizar respuestas con Ollama';
-    this.synthBtn.innerHTML = '<span class="synth-btn__dot"></span><span>Sintetizar</span>';
+    this.synthBtn.title = 'Synthesize responses with Ollama';
+    this.synthBtn.innerHTML = '<span class="synth-btn__dot"></span><span>Synthesize</span>';
     this.synthBtn.addEventListener('click', () => this.h.onSynth());
 
     this.modeBtn = document.createElement('button');
@@ -143,12 +143,12 @@ export class SearchBar {
     // ── Improve-prompt checkbox ──────────────────────────────────────────────
     const improveLabel = document.createElement('label');
     improveLabel.className = 'improve-toggle';
-    improveLabel.title = 'Reescribir el prompt con IA antes de enviarlo';
+    improveLabel.title = 'Rewrite the prompt with AI before sending it';
     this.improveCheckbox = document.createElement('input');
     this.improveCheckbox.type = 'checkbox';
     this.improveCheckbox.checked = true;
     const improveSpan = document.createElement('span');
-    improveSpan.textContent = '✦ Mejorar prompt';
+    improveSpan.textContent = '✦ Improve prompt';
     improveLabel.append(this.improveCheckbox, improveSpan);
 
     synthGroup.append(improveLabel, this.synthBtn, this.modeBtn);

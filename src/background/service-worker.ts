@@ -20,7 +20,7 @@ async function syncActionTitle(): Promise<void> {
   const existing = await chrome.tabs.query({ url: UI_URL });
   const isOpen = existing.length > 0;
   await chrome.action.setTitle({
-    title: isOpen ? '↺ Reiniciar Multi-AI' : 'Abrir Multi-AI'
+    title: isOpen ? '↺ Restart Multi-AI' : 'Open Multi-AI'
   });
 }
 
@@ -82,7 +82,7 @@ async function handlePerplexityMessage(message: BackgroundRequest): Promise<Back
 
   if (message.type === 'MULTIAI_PERPLEXITY_SUBMIT') {
     const tab = await ensurePerplexityTab(false);
-    if (tab.id === undefined) return { ok: false, error: 'No se pudo abrir Perplexity.' };
+    if (tab.id === undefined) return { ok: false, error: 'Could not open Perplexity.' };
     lastPerplexityQuery = message.query;
     const url = PERPLEXITY_SEARCH + encodeURIComponent(message.query);
     await chrome.tabs.update(tab.id, { url, active: false });
@@ -94,14 +94,14 @@ async function handlePerplexityMessage(message: BackgroundRequest): Promise<Back
     if (!tab?.id) {
       return {
         ok: false,
-        error: 'No hay una pestaña de Perplexity abierta.',
+        error: 'No Perplexity tab is open.',
         needsUserAction: true
       };
     }
     return extractPerplexityFromTab(tab.id, message.query ?? lastPerplexityQuery);
   }
 
-  return { ok: false, error: 'Mensaje Perplexity no soportado.' };
+  return { ok: false, error: 'Perplexity message not supported.' };
 }
 
 async function ensurePerplexityTab(active: boolean): Promise<chrome.tabs.Tab> {
@@ -131,7 +131,7 @@ async function extractPerplexityFromTab(tabId: number, query: string): Promise<B
       args: [query]
     });
     const result = results[0]?.result as BackgroundResponse | undefined;
-    return result ?? { ok: false, error: 'Perplexity no devolvio resultado.' };
+    return result ?? { ok: false, error: 'Perplexity returned no result.' };
   } catch (error) {
     return {
       ok: false,
@@ -165,20 +165,24 @@ function extractPerplexityInPage(query: string): BackgroundResponse {
       'espacios',
       'spaces',
       'respuesta',
+      'answer',
       'enlaces',
+      'links',
       'imagenes',
-      'imágenes',
+      'images',
       'lugares',
+      'places',
       'compartir',
+      'share',
       'copiar',
+      'copy',
       'pro',
       'saber mas',
-      'saber más',
+      'learn more',
       'modelo',
+      'model',
       'vista previa gratuita de la busqueda avanzada activada',
-      'vista previa gratuita de la búsqueda avanzada activada',
-      'share',
-      'copy',
+      'free preview of advanced search activated',
       'solicitar seguimiento',
       'ask follow-up',
       'follow up'
@@ -189,16 +193,12 @@ function extractPerplexityInPage(query: string): BackgroundResponse {
     const normalized = normalizeLocal(line);
     if (line.endsWith('?') && line.length < 220) return true;
     return (
-      normalized.startsWith('cual ') ||
-      normalized.startsWith('como ') ||
-      normalized.startsWith('cuanto ') ||
-      normalized.startsWith('dando ') ||
-      normalized.startsWith('necesito ') ||
-      normalized.startsWith('buscame ') ||
-      normalized.startsWith('buscmae ') ||
+      normalized.startsWith('which ') ||
+      normalized.startsWith('how ') ||
+      normalized.startsWith('giving ') ||
       normalized.startsWith('i need ') ||
-      normalized.startsWith('what ') ||
-      normalized.startsWith('how ')
+      normalized.startsWith('search ') ||
+      normalized.startsWith('what ')
     ) && line.length < 180;
   }
 
@@ -212,13 +212,12 @@ function extractPerplexityInPage(query: string): BackgroundResponse {
 
   function cleanLinesLocal(raw: string, localQuery: string): string[] {
     const bannedExact = new Set([
-      'Respuesta',
-      'Enlaces',
-      'Imagenes',
-      'Imágenes',
-      'Lugares',
-      'Compartir',
-      'Solicitar seguimiento'
+      'Answer',
+      'Links',
+      'Images',
+      'Places',
+      'Share',
+      'Ask follow-up'
     ]);
     const normalizedQuery = normalizeLocal(localQuery);
 
@@ -264,7 +263,7 @@ function extractPerplexityInPage(query: string): BackgroundResponse {
     const stopIndex = lines.findIndex((line) => {
       const normalized = normalizeLocal(line);
       return (
-        normalized === 'solicitar seguimiento' ||
+        normalized === 'ask follow-up' ||
         normalized === 'related'
       );
     });
@@ -379,7 +378,7 @@ function extractPerplexityInPage(query: string): BackgroundResponse {
   if (challenge) {
     return {
       ok: false,
-      error: 'Perplexity necesita verificacion humana en su pestaña real.',
+      error: 'Perplexity needs human verification in its real tab.',
       needsUserAction: true
     };
   }
@@ -431,8 +430,8 @@ function extractPerplexityInPage(query: string): BackgroundResponse {
     return {
       ok: false,
       error: preview
-        ? `Perplexity esta abierto, pero no encontre el bloque de respuesta. Preview: ${preview}`
-        : 'Perplexity esta abierto, pero todavia no hay respuesta visible.',
+        ? `Perplexity is open, but I couldn't find the answer block. Preview: ${preview}`
+        : 'Perplexity is open, but there is no visible answer yet.',
       stable: false
     };
   }
@@ -518,7 +517,7 @@ function trimAfterFollowupUi(lines: string[]): string[] {
   const stopIndex = lines.findIndex((line) => {
     const normalized = normalize(line);
     return (
-      normalized === 'solicitar seguimiento' ||
+      normalized === 'ask follow-up' ||
       normalized === 'related'
     );
   });
@@ -531,19 +530,16 @@ function cleanPerplexityText(raw: string, query: string): string {
 
 function cleanPerplexityLines(raw: string, query: string): string[] {
   const bannedExact = new Set([
-    'Respuesta',
-    'Enlaces',
-    'Imagenes',
-    'Imágenes',
-    'Lugares',
-      'Compartir',
-      'Pro',
-      'Saber más',
-      'Saber mas',
-      'Modelo',
-      'Vista previa gratuita de la búsqueda avanzada activada.',
-      'Vista previa gratuita de la busqueda avanzada activada.',
-      'Solicitar seguimiento'
+    'Answer',
+    'Links',
+    'Images',
+    'Places',
+    'Share',
+    'Pro',
+    'Learn more',
+    'Model',
+    'Free preview of advanced search activated.',
+    'Ask follow-up'
   ]);
   const normalizedQuery = normalize(query);
 
@@ -580,23 +576,16 @@ function isLikelyUiLine(line: string): boolean {
   if (/^\d+$/.test(normalized)) return true;
   if (normalized.length <= 2) return true;
   return [
-    'inicio',
     'home',
     'discover',
-    'biblioteca',
     'library',
-    'espacios',
     'spaces',
-    'respuesta',
-    'enlaces',
-    'imagenes',
-    'imágenes',
-    'lugares',
-    'compartir',
-    'copiar',
+    'answer',
+    'links',
+    'images',
+    'places',
     'share',
     'copy',
-    'solicitar seguimiento',
     'ask follow-up',
     'follow up'
   ].includes(normalized);

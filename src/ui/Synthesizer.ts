@@ -55,7 +55,7 @@ export class Synthesizer {
 
     if (frames.length === 0 && extraResponses.length === 0) {
       this.view.show(query, []);
-      this.view.showError('No hay AIs activos para sintetizar.');
+      this.view.showError('No active AIs to synthesize.');
       return;
     }
 
@@ -115,13 +115,13 @@ export class Synthesizer {
 
     if (responses.length === 0) {
       this.view.showError(
-        'No se pudo capturar ninguna respuesta de los AIs. ¿Esperaste a que arranquen?'
+        'Could not capture any response from the AIs. Did you wait for them to start?'
       );
       return;
     }
 
     // 2. Try to pick a local Ollama model; fall back gracefully if unavailable.
-    this.view.setStatus('Seleccionando modelo de Ollama...');
+    this.view.setStatus('Selecting Ollama model...');
     let model: string | null = null;
     try {
       const preferred = this.getPreferredModel();
@@ -132,7 +132,7 @@ export class Synthesizer {
 
     if (!model) {
       // ── Fallback: no Ollama available ──────────────────────────────────────
-      this.view.setStatus('Ollama no disponible — mostrando respuestas sin síntesis.');
+      this.view.setStatus('Ollama unavailable — showing unsynthesized responses.');
       this.view.setContent(this.formatFallback(query, responses));
       return;
     }
@@ -143,7 +143,7 @@ export class Synthesizer {
     // 3. Build prompt and send exactly one non-streaming generation request.
     const prompt = buildSynthesisPrompt(query, responses);
     this.view.setPrompt(prompt);
-    this.view.setStatus(`Enviando 1 prompt a Ollama (${model})...`);
+    this.view.setStatus(`Sending 1 prompt to Ollama (${model})...`);
     console.info('[multiai] Ollama generate request:', {
       model,
       promptChars: prompt.length,
@@ -155,17 +155,17 @@ export class Synthesizer {
       if (!response.trim()) {
         // Empty response — also fall back to plain formatting
         this.view.setContent(this.formatFallback(query, responses));
-        this.view.setStatus('Ollama no devolvió texto — mostrando respuestas sin síntesis.');
+        this.view.setStatus('Ollama returned no text — showing unsynthesized responses.');
       } else {
         this.view.setContent(response);
-        this.view.setStatus('Sintesis completa.');
+        this.view.setStatus('Synthesis complete.');
       }
     } catch (e) {
       if (ctrl.signal.aborted) return;
       // Generation failed — fall back instead of showing an error
       console.warn('[multiai] Ollama generate failed, using fallback:', e);
       this.view.setContent(this.formatFallback(query, responses));
-      this.view.setStatus('Ollama falló — mostrando respuestas sin síntesis.');
+      this.view.setStatus('Ollama failed — showing unsynthesized responses.');
     }
   }
 
@@ -213,7 +213,7 @@ export class Synthesizer {
 
   async refreshModelList(): Promise<void> {
     try {
-      this.view.setStatus('Consultando modelos de Ollama local...');
+      this.view.setStatus('Querying local Ollama models...');
       const models = await this.client.listModels();
       const preferred = this.getPreferredModel();
       const current =
@@ -226,13 +226,13 @@ export class Synthesizer {
       }
       this.view.setStatus(
         models.length > 0
-          ? `Modelos actualizados (${models.length}).`
-          : 'Ollama local no devolvio modelos.'
+          ? `Models updated (${models.length}).`
+          : 'Local Ollama returned no models.'
       );
     } catch (e) {
       console.warn('[multiai] could not list ollama models:', e);
       this.view.setModels([], null);
-      this.view.setStatus('No se pudieron consultar modelos de Ollama local.');
+      this.view.setStatus('Could not query local Ollama models.');
     }
   }
 
@@ -248,8 +248,8 @@ export class Synthesizer {
       })
       .join('\n\n---\n\n');
     return [
-      `> ⚠️ **Ollama no disponible** — se muestran las respuestas individuales sin síntesis.`,
-      `> Instalá Ollama en [ollama.com](https://ollama.com) y ejecutá \`ollama run nemotron-3-super:cloud\` para habilitar la síntesis.`,
+      `> ⚠️ **Ollama unavailable** — showing individual responses without synthesis.`,
+      `> Install Ollama at [ollama.com](https://ollama.com) and run \`ollama run nemotron-3-super:cloud\` to enable synthesis.`,
       '',
       sections
     ].join('\n');
@@ -258,7 +258,7 @@ export class Synthesizer {
   private formatOllamaError(e: unknown): string {
     if (e instanceof OllamaError) return `❌ ${e.message}`;
     if (e instanceof Error) return `❌ ${e.message}`;
-    return '❌ Error desconocido al hablar con Ollama.';
+    return '❌ Unknown error when talking to Ollama.';
   }
 }
 

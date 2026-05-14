@@ -20,8 +20,6 @@ const SUBMIT_SELECTORS = [
   'button[aria-label="Send Message"]',
   'button[aria-label="Send"]',
   'button[aria-label*="send" i]',
-  'button[aria-label*="enviar" i]',
-  'button[aria-label*="mensaje" i]',
   'button[data-testid="send-button"]',
   'button[data-testid="chat-submit-button"]',
   'button[data-testid="composer-send-button"]',
@@ -122,8 +120,6 @@ function isUsableSendButton(button: HTMLButtonElement): boolean {
 
   const looksLikeSend =
     label.includes('send') ||
-    label.includes('enviar') ||
-    label.includes('mensaje') ||
     label.includes('envoyer') ||
     label.includes('submit') ||
     label.includes('chat-submit') ||
@@ -148,7 +144,6 @@ function isUsableSendButton(button: HTMLButtonElement): boolean {
 function looksLikeBadButton(label: string): boolean {
   return (
     label.includes('attach') ||
-    label.includes('adjuntar') ||
     label.includes('upload') ||
     label.includes('file') ||
     label.includes('mic') ||
@@ -157,12 +152,8 @@ function looksLikeBadButton(label: string): boolean {
     label.includes('search') ||
     label.includes('tool') ||
     label.includes('share') ||
-    label.includes('compartir') ||
     label.includes('copy') ||
-    label.includes('copiar') ||
-    label.includes('more') ||
-    label.includes('mas') ||
-    label.includes('más')
+    label.includes('more')
   );
 }
 

@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(python3 -c \"import graphify\")",
+      "Bash(python3 -m pip install graphifyy -q)",
+      "Bash(python3 -c \"import graphify; print\\('OK'\\)\")",
+      "Bash(where python3 *)",
+      "Bash(where python *)",
+      "Bash(py --list)",
+      "Bash(winget install *)",
+      "PowerShell(winget install *)",
+      "PowerShell(uv *)",
+      "PowerShell(uv tool *)",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(awk 'NR%2==1{path=$0; getline; print path \" \\(\" $0 \"\\)\"}')",
+      "PowerShell(git clone *)"
+    ]
+  }
+}

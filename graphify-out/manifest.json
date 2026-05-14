@@ -1,0 +1,114 @@
+{
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\vite.config.ts": {
+    "mtime": 1777713875.388255,
+    "hash": "9f4eed88a5b32a660530f29846fb203c"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\manifest.ts": {
+    "mtime": 1777713430.8599806,
+    "hash": "506ea4dd8890ba870ef055a40754a7c5"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\types.ts": {
+    "mtime": 1777714237.5779817,
+    "hash": "6b29893b65eb02a817731a58c1cd9675"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\background\\service-worker.ts": {
+    "mtime": 1778082304.0612297,
+    "hash": "b8d44ef876c96ef0a2ec1934144fc195"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\content\\inject.ts": {
+    "mtime": 1777881428.1927695,
+    "hash": "f3976f945ee3cfa1c5657c55af9c57bb"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\lib\\messaging.ts": {
+    "mtime": 1777354419.532278,
+    "hash": "1691741f8312ada2ccbb6f9463927506"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\lib\\storage.ts": {
+    "mtime": 1777411540.1509738,
+    "hash": "f0bac7a96eabdd804d557739c2c76b0d"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\sites\\chatgpt.ts": {
+    "mtime": 1777403893.5893335,
+    "hash": "4dcfba7187ebc2ba31946cbc1905361c"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\sites\\claude.ts": {
+    "mtime": 1777413338.7069564,
+    "hash": "1a64b17d2e26049a55429ed4bc8588a9"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\sites\\dom-utils.ts": {
+    "mtime": 1777412204.914927,
+    "hash": "bfea1d4b4e6cf15431a7ff47b23dcab6"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\sites\\gemini.ts": {
+    "mtime": 1777354295.117661,
+    "hash": "df8ac855792a50c993f0468015864648"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\sites\\index.ts": {
+    "mtime": 1777354310.9354258,
+    "hash": "b1690479761c174cd06af42eed024b51"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\sites\\perplexity.ts": {
+    "mtime": 1777356813.7332656,
+    "hash": "de3e8a91c9003ddbdc043e61875e19ca"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\sites\\registry.ts": {
+    "mtime": 1777411533.943167,
+    "hash": "816ec506dc21b72daae565ad6b7587cd"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\synth\\markdown.ts": {
+    "mtime": 1777723122.394391,
+    "hash": "5793b06811ad1df90f576427e2ae27b7"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\synth\\ollama.ts": {
+    "mtime": 1777714267.1224692,
+    "hash": "abbecbcf20c097cd32c99a08d9f374fa"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\synth\\prompt.ts": {
+    "mtime": 1778164234.844221,
+    "hash": "455e4015952f53e86a554079a353d00f"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\ui\\main.ts": {
+    "mtime": 1778139785.9633474,
+    "hash": "9f1d4df69917e32c58c94b1500d83902"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\ui\\Synthesizer.ts": {
+    "mtime": 1778139777.8319242,
+    "hash": "fb94c3c944b93b45e0e12c2295f5d43b"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\ui\\components\\IframesGrid.ts": {
+    "mtime": 1777411600.2582552,
+    "hash": "2090a7f82bf7cc2c89c29f58773388b1"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\ui\\components\\SearchBar.ts": {
+    "mtime": 1778138610.1310384,
+    "hash": "2edf4d2ad99e5090a5a9582741f3f491"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\ui\\components\\SynthesisView.ts": {
+    "mtime": 1778166243.807983,
+    "hash": "5a434ca9a109b5b7266198adbdba2a61"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\README.md": {
+    "mtime": 1777354908.864777,
+    "hash": "d34217cdc562f256c2e339a87a90758a"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\TODO.md": {
+    "mtime": 1778078340.9135911,
+    "hash": "66d30d6e78368bfa029a04b776c818dc"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\src\\ui\\main.html": {
+    "mtime": 1777354424.883419,
+    "hash": "dc63e905fa7a192be595971be078afc3"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\public\\icons\\icon-128.png": {
+    "mtime": 1777354634.0597568,
+    "hash": "b1387d7079f5e37f3a961458bf25d86c"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\public\\icons\\icon-16.png": {
+    "mtime": 1777354634.0382524,
+    "hash": "cea019c76a60ff2a86978650e9528736"
+  },
+  "D:\\Desarrollo\\personal\\Extensiones Chrome\\Multi-AI-v2\\public\\icons\\icon-48.png": {
+    "mtime": 1777354634.0479636,
+    "hash": "11d36e81b95ee3d93e5cc31e4e538c6c"
+  }
+}

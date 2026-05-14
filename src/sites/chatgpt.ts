@@ -34,10 +34,7 @@ const SUBMIT_SELECTORS = [
   'button[data-testid="composer-send-button"]',
   'button[aria-label="Send prompt"]',
   'button[aria-label="Send message"]',
-  'button[aria-label="Enviar mensaje"]',
-  'button[aria-label="Enviar"]',
   'button[aria-label*="send" i]',
-  'button[aria-label*="enviar" i]',
   'button[type="submit"]'
 ] as const;
 
@@ -134,7 +131,6 @@ function isUsableSendButton(button: HTMLButtonElement): boolean {
 
   const looksLikeSend =
     label.includes('send') ||
-    label.includes('enviar') ||
     label.includes('submit') ||
     label.includes('composer-send') ||
     label.includes('send-button');

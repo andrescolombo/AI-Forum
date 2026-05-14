@@ -82,20 +82,20 @@ export class IframesGrid {
     const open = document.createElement('button');
     open.className = 'mirror-frame__open';
     open.type = 'button';
-    open.textContent = 'Abrir';
-    open.title = 'Abrir la pestaña real de Perplexity';
+    open.textContent = 'Open';
+    open.title = 'Open the real Perplexity tab';
     open.addEventListener('click', () => this.options.onOpenPerplexity?.());
 
     header.append(title, open);
 
     const status = document.createElement('div');
     status.className = 'mirror-frame__status';
-    status.textContent = 'Listo para usar una pestaña real de Perplexity en segundo plano.';
+    status.textContent = 'Ready to use a real Perplexity tab in the background.';
 
     const content = document.createElement('div');
     content.className = 'mirror-frame__content md';
     content.innerHTML =
-      '<p>Perplexity se ejecuta en una pestaña normal del navegador y este panel muestra una copia de la respuesta.</p>';
+      '<p>Perplexity runs in a normal browser tab and this panel shows a copy of the response.</p>';
 
     root.append(header, status, content);
     this.el.append(root);

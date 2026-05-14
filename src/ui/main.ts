@@ -53,7 +53,7 @@ class App {
     this.synthesizer = this.createSynthesizer(this.activeView());
     this.panelView.onClose(() => this.grid.detachPanel(this.panelView.el));
 
-    // "Usar en prompt" — fills the search bar with the synthesis text
+    // "Use in prompt" — fills the search bar with the synthesis text
     const reuseHandler = (text: string) => {
       this.searchBar.setQuery(text);
       this.searchBar.focus();
@@ -206,7 +206,7 @@ class App {
   }
 
   private async onSynth(): Promise<void> {
-    const query = this.lastQuery() ?? '(sin consulta - pedi algo primero)';
+    const query = this.lastQuery() ?? '(no query - ask something first)';
     const view = this.activeView();
     this.synthesizer = this.createSynthesizer(view);
 
@@ -240,10 +240,10 @@ class App {
   private async submitPerplexity(query: string): Promise<void> {
     this.grid.setMirrorStatus(
       'perplexity',
-      'Abriendo Perplexity en una pestana en segundo plano...',
+      'Opening Perplexity in a background tab...',
       'busy'
     );
-    this.grid.setMirrorContent('perplexity', 'Esperando respuesta de Perplexity...');
+    this.grid.setMirrorContent('perplexity', 'Waiting for Perplexity response...');
 
     const submit = await this.sendBackground({
       type: 'MULTIAI_PERPLEXITY_SUBMIT',
@@ -255,7 +255,7 @@ class App {
       return;
     }
 
-    this.grid.setMirrorStatus('perplexity', 'Pregunta enviada. Capturando respuesta visible...', 'busy');
+    this.grid.setMirrorStatus('perplexity', 'Query sent. Capturing visible response...', 'busy');
     await this.pollPerplexityAnswer(query);
   }
 
@@ -277,7 +277,7 @@ class App {
         }
         this.grid.setMirrorStatus(
           'perplexity',
-          extracted.error ?? 'Esperando respuesta de Perplexity...',
+          extracted.error ?? 'Waiting for Perplexity response...',
           'busy'
         );
         continue;
@@ -297,8 +297,8 @@ class App {
       this.grid.setMirrorStatus(
         'perplexity',
         ready
-          ? 'Respuesta lista para sintetizar.'
-          : `Capturando Perplexity... ${text.length.toLocaleString()} caracteres`,
+          ? 'Response ready to synthesize.'
+          : `Capturing Perplexity... ${text.length.toLocaleString()} characters`,
         ready ? 'ok' : 'busy'
       );
 
@@ -310,11 +310,11 @@ class App {
 
     if (lastText) {
       this.perplexityResponse = { siteId: 'perplexity', text: lastText };
-      this.grid.setMirrorStatus('perplexity', 'Tiempo agotado; se usara la respuesta parcial.', 'ok');
+      this.grid.setMirrorStatus('perplexity', 'Timeout; using partial response.', 'ok');
       return this.perplexityResponse;
     }
 
-    this.grid.setMirrorStatus('perplexity', 'No se pudo capturar respuesta de Perplexity.', 'fail');
+    this.grid.setMirrorStatus('perplexity', 'Could not capture Perplexity response.', 'fail');
     return null;
   }
 
@@ -329,7 +329,7 @@ class App {
     if (extracted.ok && extracted.text?.trim()) {
       this.perplexityResponse = { siteId: 'perplexity', text: extracted.text.trim() };
       this.grid.setMirrorContent('perplexity', this.perplexityResponse.text);
-      this.grid.setMirrorStatus('perplexity', 'Respuesta capturada para sintetizar.', 'ok');
+      this.grid.setMirrorStatus('perplexity', 'Response captured for synthesis.', 'ok');
       return [this.perplexityResponse];
     }
     return [];
@@ -342,8 +342,8 @@ class App {
 
   private showPerplexityError(response: BackgroundResponse): void {
     const message = response.needsUserAction
-      ? 'Perplexity necesita verificacion humana. Usa "Abrir", resolvelo una vez y vuelve a la extension.'
-      : response.error ?? 'No se pudo usar Perplexity.';
+      ? 'Perplexity requires human verification. Use "Open", resolve it once, and return to the extension.'
+      : response.error ?? 'Could not use Perplexity.';
     this.grid.setMirrorStatus('perplexity', message, 'fail');
     this.grid.setMirrorContent('perplexity', message);
   }
@@ -376,7 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const app = document.getElementById('app');
     if (app) {
       app.innerHTML =
-        '<div class="error-box" style="margin: 24px;">No se pudo iniciar la extension: ' +
+        '<div class="error-box" style="margin: 24px;">Could not start the extension: ' +
         String((e as Error).message) +
         '</div>';
     }

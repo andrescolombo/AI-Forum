@@ -50,12 +50,12 @@ function buildHeader(title: string, onClose: () => void): {
   modelRow.className = 'synth-modal__model-row';
   const lbl = document.createElement('span');
   lbl.className = 'synth-modal__model-label';
-  lbl.textContent = 'Modelo:';
+  lbl.textContent = 'Model:';
   const select = document.createElement('select');
   const refresh = document.createElement('button');
   refresh.className = 'synth-modal__model-refresh';
   refresh.type = 'button';
-  refresh.title = 'Consultar modelos disponibles en Ollama local';
+  refresh.title = 'Query models available in local Ollama';
   refresh.textContent = 'Refresh';
   modelRow.append(lbl, select, refresh);
   return { root: header, modelSelect: select, modelLabel: lbl, modelRefresh: refresh };
@@ -85,7 +85,7 @@ function buildProgressBar(): {
   const resynthBtn = document.createElement('button');
   resynthBtn.className = 'synth-resynth-btn';
   resynthBtn.type = 'button';
-  resynthBtn.textContent = '🔄 Re-sintetizar';
+  resynthBtn.textContent = '🔄 Re-synthesize';
   resynthBtn.style.display = 'none';
 
   wrap.append(pillRow, resynthBtn);
@@ -104,8 +104,8 @@ function buildProgressBar(): {
     const sel = getSelected();
     resynthBtn.disabled = sel.length === 0;
     resynthBtn.title = sel.length === 0
-      ? 'Seleccioná al menos una IA'
-      : `Re-sintetizar con: ${sel.map((id) => SITES[id].displayName).join(', ')}`;
+      ? 'Select at least one AI'
+      : `Re-synthesize with: ${sel.map((id) => SITES[id].displayName).join(', ')}`;
   }
 
   resynthBtn.addEventListener('click', () => {
@@ -154,7 +154,7 @@ function buildProgressBar(): {
         if (!okSites.has(id)) return; // can't toggle failed sites
         pill.dataset.selectable = 'true';
         pill.dataset.excluded = 'false';
-        pill.title = 'Clic para excluir de la re-síntesis';
+        pill.title = 'Click to exclude from re-synthesis';
         // Remove old listeners by replacing
         const newPill = pill.cloneNode(true) as HTMLElement;
         newPill.addEventListener('click', () => {
@@ -164,12 +164,12 @@ function buildProgressBar(): {
             excluded.delete(id);
             newPill.dataset.excluded = 'false';
             newPill.textContent = `✅ ${name}`;
-            newPill.title = 'Clic para excluir de la re-síntesis';
+            newPill.title = 'Click to exclude from re-synthesis';
           } else {
             excluded.add(id);
             newPill.dataset.excluded = 'true';
             newPill.textContent = `✖ ${name}`;
-            newPill.title = 'Clic para incluir en la re-síntesis';
+            newPill.title = 'Click to include in re-synthesis';
           }
           // Update our map reference
           pills.set(id, newPill);
@@ -199,7 +199,7 @@ function buildPromptBox(): {
   const el = document.createElement('details');
   el.className = 'prompt-box';
   const summary = document.createElement('summary');
-  summary.textContent = 'Ver prompt enviado a Ollama';
+  summary.textContent = 'View prompt sent to Ollama';
   const pre = document.createElement('pre');
   pre.className = 'prompt-box__content';
   const code = document.createElement('code');
@@ -238,9 +238,9 @@ function buildActionBar(opts: {
     return b;
   };
 
-  const copyBtn  = mkBtn('📋 Copiar',        'Copiar síntesis al portapapeles',       'synth-action-btn--copy');
-  const obsBtn   = mkBtn('🪹 Obsidian',       'Guardar en Obsidian',                   'synth-action-btn--obs');
-  const reuseBtn = mkBtn('↩ Usar en prompt', 'Poner síntesis en el campo de búsqueda','synth-action-btn--reuse');
+  const copyBtn  = mkBtn('📋 Copy',        'Copy synthesis to clipboard',       'synth-action-btn--copy');
+  const obsBtn   = mkBtn('🪹 Obsidian',       'Save to Obsidian',                   'synth-action-btn--obs');
+  const reuseBtn = mkBtn('↩ Use in prompt', 'Put synthesis in the search field','synth-action-btn--reuse');
 
   copyBtn.addEventListener('click', () => opts.onCopy(raw));
   obsBtn.addEventListener('click',  (e) => opts.onObsidian(raw, currentQuery, e.shiftKey));
@@ -261,11 +261,11 @@ function buildActionBar(opts: {
 function copyToClipboard(text: string, btn: Element): void {
   void navigator.clipboard.writeText(text).then(() => {
     const orig = btn.textContent;
-    btn.textContent = '✅ Copiado';
+    btn.textContent = '✅ Copied';
     setTimeout(() => { btn.textContent = orig; }, 1800);
   }).catch(() => {
     btn.textContent = '❌ Error';
-    setTimeout(() => { btn.textContent = '📋 Copiar'; }, 1800);
+    setTimeout(() => { btn.textContent = '📋 Copy'; }, 1800);
   });
 }
 
@@ -277,7 +277,7 @@ function saveToObsidian(raw: string, query: string, shiftKey = false): void {
   let vault = storedVault;
   if (!vault || shiftKey) {
     const entered = prompt(
-      shiftKey ? 'Cambiar vault de Obsidian:' : 'Nombre de tu vault de Obsidian:',
+      shiftKey ? 'Change Obsidian vault:' : 'Name of your Obsidian vault:',
       storedVault
     );
     if (!entered) return;
@@ -290,7 +290,7 @@ function saveToObsidian(raw: string, query: string, shiftKey = false): void {
   const headingMatch = raw.match(/^#\s+(.+)$/m);
   const safeTitle = headingMatch
     ? strip(headingMatch[1]).slice(0, 80)
-    : (strip(query).slice(0, 60) || 'MultiAI Síntesis');
+    : (strip(query).slice(0, 60) || 'MultiAI Synthesis');
 
   // ── Content: strip the `# Title` line — Obsidian uses the filename as title.
   // Keep any YAML frontmatter (tags) which appears before the heading.
@@ -357,7 +357,7 @@ export class SynthesisModalView implements SynthesisView {
     const dialog = document.createElement('div');
     dialog.className = 'synth-modal__dialog';
 
-    const header = buildHeader('Síntesis Multi-AI', () => this.hide());
+    const header = buildHeader('Multi-AI Synthesis', () => this.hide());
     this.modelSelect = header.modelSelect;
     this.modelLabel  = header.modelLabel;
     this.modelSelect.addEventListener('change', () => this.modelChangeHandler?.(this.modelSelect.value));
@@ -399,8 +399,8 @@ export class SynthesisModalView implements SynthesisView {
     this.actions.hide();
     this.progress.disableSelection();
     this.root.style.display = 'flex';
-    this.bodyContent.innerHTML = `<p style="color:var(--c-text-dim)"><em>Pregunta:</em> ${escapeHtml(query)}</p>`;
-    this.statusEl.textContent = 'Capturando respuestas visibles...';
+    this.bodyContent.innerHTML = `<p style="color:var(--c-text-dim)"><em>Question:</em> ${escapeHtml(query)}</p>`;
+    this.statusEl.textContent = 'Capturing visible responses...';
     this.progress.setSites(sites);
   }
 
@@ -408,7 +408,7 @@ export class SynthesisModalView implements SynthesisView {
 
   setModels(models: OllamaModel[], current: string | null): void {
     if (models.length === 0) {
-      this.modelSelect.innerHTML = '<option value="">(ningún modelo Ollama detectado)</option>';
+      this.modelSelect.innerHTML = '<option value="">(no Ollama model detected)</option>';
       this.modelSelect.disabled = true; return;
     }
     this.modelSelect.disabled = false;
@@ -423,7 +423,7 @@ export class SynthesisModalView implements SynthesisView {
   onResynth(h: (selected: SiteId[]) => void): void { this.resynthHandler = h; }
 
   setProgress(siteId: SiteId, state: 'pending' | 'ok' | 'fail'): void { this.progress.setSite(siteId, state); }
-  setActiveModel(model: string): void  { this.modelLabel.textContent = `Modelo: ${model}`; }
+  setActiveModel(model: string): void  { this.modelLabel.textContent = `Model: ${model}`; }
   setStatus(message: string): void     { this.statusEl.textContent = message; }
   setPrompt(prompt: string): void      { this.promptBox.setPrompt(prompt); }
 
@@ -470,7 +470,7 @@ export class SynthesisPanelView implements SynthesisView {
 
     const header = document.createElement('div');
     header.className = 'synth-panel__header';
-    header.innerHTML = '<span class="synth-panel__title"><span>🧠</span><span>Síntesis</span></span>';
+    header.innerHTML = '<span class="synth-panel__title"><span>🧠</span><span>Synthesis</span></span>';
     const close = document.createElement('button');
     close.className = 'synth-panel__close';
     close.type = 'button';
@@ -485,13 +485,13 @@ export class SynthesisPanelView implements SynthesisView {
     modelRow.className = 'synth-modal__model-row';
     const lbl = document.createElement('span');
     lbl.className = 'synth-modal__model-label';
-    lbl.textContent = 'Modelo:';
+    lbl.textContent = 'Model:';
     this.modelSelect = document.createElement('select');
     this.modelSelect.addEventListener('change', () => this.modelChangeHandler?.(this.modelSelect.value));
     const refresh = document.createElement('button');
     refresh.className = 'synth-modal__model-refresh';
     refresh.type = 'button';
-    refresh.title = 'Consultar modelos disponibles en Ollama local';
+    refresh.title = 'Query models available in local Ollama';
     refresh.textContent = 'Refresh';
     refresh.addEventListener('click', () => this.modelRefreshHandler?.());
     modelRow.append(lbl, this.modelSelect, refresh);
@@ -529,8 +529,8 @@ export class SynthesisPanelView implements SynthesisView {
     this.currentQuery = query;
     this.actions.hide();
     this.progress.disableSelection();
-    this.bodyContent.innerHTML = `<p style="color:var(--c-text-dim)"><em>Pregunta:</em> ${escapeHtml(query)}</p>`;
-    this.statusEl.textContent = 'Capturando respuestas visibles...';
+    this.bodyContent.innerHTML = `<p style="color:var(--c-text-dim)"><em>Question:</em> ${escapeHtml(query)}</p>`;
+    this.statusEl.textContent = 'Capturing visible responses...';
     this.progress.setSites(sites);
   }
 
@@ -538,7 +538,7 @@ export class SynthesisPanelView implements SynthesisView {
 
   setModels(models: OllamaModel[], current: string | null): void {
     if (models.length === 0) {
-      this.modelSelect.innerHTML = '<option value="">(sin modelos)</option>';
+      this.modelSelect.innerHTML = '<option value="">(no models)</option>';
       this.modelSelect.disabled = true; return;
     }
     this.modelSelect.disabled = false;

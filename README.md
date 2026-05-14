@@ -1,48 +1,48 @@
 # Multi-AI v2
 
-Reescritura limpia del comparador multi-AI. Pregunta una sola vez y obtené respuestas en paralelo de ChatGPT, Claude, Gemini y Perplexity, después sintetizalas con Ollama (local o cloud) en una sola respuesta unificada.
+Clean rewrite of the multi-AI comparator. Ask once and get parallel answers from ChatGPT, Claude, Gemini, and Perplexity, then synthesize them with Ollama (local or cloud) into a single unified response.
 
-## Por qué v2
+## Why v2
 
-La v1 (`../Multi AI/`) creció orgánicamente y terminó con archivos de 4500+ líneas, mezcla de responsabilidades (síntesis dentro de iframe.js, estado tirado en chrome.storage sin esquema, selectores DOM sin fallbacks tipados, manejo de mensajes sin tipos). v2 reescribe desde cero con:
+Version 1 (`../Multi AI/`) grew organically and ended up with 4500+ line files, mixed responsibilities (synthesis inside iframe.js, state thrown into chrome.storage without a schema, DOM selectors without typed fallbacks, untyped message handling). v2 is rewritten from scratch with:
 
-- **TypeScript estricto** — tipos compartidos para mensajes (discriminated unions), sites, prefs.
-- **SiteAdapter pattern** — cada AI implementa la misma interfaz (`matches/submitQuery/extractAnswer`); agregar otra AI son 30 líneas en un archivo nuevo.
-- **Vite + CRXJS** — HMR en desarrollo, build optimizado, manifest definido en TS para que rompa al cambiar el shape.
-- **Cero polling de respuesta estable** — el botón "Sintetizar" siempre extrae lo que hay en pantalla en ese instante. Vos decidís cuándo está listo.
-- **Streaming markdown** — tokens de Ollama se renderizan en vivo con un parser inline (sin libs externas).
-- **Modal o panel N+1** — toggle entre modal centrado o columna extra al lado de los iframes.
+- **Strict TypeScript** — shared types for messages (discriminated unions), sites, prefs.
+- **SiteAdapter pattern** — every AI implements the same interface (`matches/submitQuery/extractAnswer`); adding another AI is just 30 lines in a new file.
+- **Vite + CRXJS** — HMR in development, optimized build, manifest defined in TS so it breaks if the shape changes.
+- **Zero stable response polling** — the "Synthesize" button always extracts whatever is on the screen at that instant. You decide when it's ready.
+- **Streaming markdown** — Ollama tokens are rendered live with an inline parser (no external libs).
+- **Modal or panel N+1** — toggle between a centered modal or an extra column next to the iframes.
 
-## Estructura
+## Structure
 
-```
+```text
 src/
-├── manifest.ts             # Manifest V3 tipado (CRXJS)
-├── types.ts                # Single source of truth para mensajes, sites, prefs
+├── manifest.ts             # Typed V3 Manifest (CRXJS)
+├── types.ts                # Single source of truth for messages, sites, prefs
 ├── lib/
-│   ├── messaging.ts        # postMessage helpers tipados con timeouts
+│   ├── messaging.ts        # Typed postMessage helpers with timeouts
 │   └── storage.ts          # chrome.storage wrapper
-├── sites/                  # Un adapter por AI
-│   ├── dom-utils.ts        # Helpers para ProseMirror/contenteditable/textarea
+├── sites/                  # One adapter per AI
+│   ├── dom-utils.ts        # Helpers for ProseMirror/contenteditable/textarea
 │   ├── chatgpt.ts
 │   ├── claude.ts
 │   ├── gemini.ts
 │   ├── perplexity.ts
-│   ├── registry.ts         # Descriptores estáticos
+│   ├── registry.ts         # Static descriptors
 │   └── index.ts            # adapterForUrl()
 ├── content/
-│   └── inject.ts           # Content script que enrutea al adapter
+│   └── inject.ts           # Content script that routes to the adapter
 ├── synth/
-│   ├── ollama.ts           # Cliente con streaming NDJSON
-│   ├── prompt.ts           # Builder del prompt de síntesis
-│   └── markdown.ts         # Parser inline (sin libs)
+│   ├── ollama.ts           # NDJSON streaming client
+│   ├── prompt.ts           # Synthesis prompt builder
+│   └── markdown.ts         # Inline parser (no external libs)
 ├── background/
-│   └── service-worker.ts   # Abre la página al click del icono
+│   └── service-worker.ts   # Opens the page on icon click
 └── ui/
     ├── main.html
-    ├── main.ts             # Entry: orquesta App
+    ├── main.ts             # Entry: orchestrates App
     ├── styles.css
-    ├── Synthesizer.ts      # Orquesta extract + ollama + render
+    ├── Synthesizer.ts      # Orchestrates extract + ollama + render
     └── components/
         ├── IframesGrid.ts
         ├── SearchBar.ts
@@ -53,45 +53,45 @@ src/
 
 ```bash
 npm install
-npm run dev      # Vite con HMR — recarga la extensión cuando cambia algo
-npm run build    # Genera dist/
+npm run dev      # Vite with HMR — reloads the extension when something changes
+npm run build    # Generates dist/
 npm run typecheck
 ```
 
-## Cargar en Chrome
+## Load in Chrome
 
 1. `npm run build`
-2. `chrome://extensions` → "Modo desarrollador" ON
-3. "Cargar descomprimida" → seleccionar la carpeta `dist/`
-4. Click en el icono de la extensión → se abre la página de comparación
+2. `chrome://extensions` → "Developer mode" ON
+3. "Load unpacked" → select the `dist/` folder
+4. Click on the extension icon → the comparison page opens
 
-## Requisitos para la síntesis
+## Requirements for synthesis
 
-- [Ollama](https://ollama.com) corriendo en `localhost:11434`
-- Por lo menos un modelo instalado: `ollama pull llama3.1` (o cualquier otro, incluso modelos `:cloud`)
+- [Ollama](https://ollama.com) running on `localhost:11434`
+- At least one model installed: `ollama pull llama3.1` (or any other, even `:cloud` models)
 
-## Diferencias clave con v1
+## Key differences with v1
 
-| Aspecto                 | v1 (Multi AI)                                        | v2                                              |
-|-------------------------|------------------------------------------------------|-------------------------------------------------|
-| Lenguaje                | JS plano                                             | TypeScript estricto                             |
-| Build                   | Sin build (carga directa)                            | Vite + CRXJS                                    |
-| iframe.js               | 4689 líneas, todo mezclado                           | UI dividida en 6 archivos < 250 líneas cada uno |
-| Mensajes                | postMessage sin tipos, requestId opcional            | Discriminated unions tipadas, requestId siempre |
-| SiteAdapters            | Configuración JSON + handlers JS dispersos           | Una clase por sitio, contrato uniforme          |
-| Síntesis stable         | Polling con detección de "respuesta estable"         | Manual instantáneo (vos elegís el momento)      |
-| Markdown                | textContent (texto plano)                            | Parser inline, code/headers/lists/blockquote    |
-| Persistencia            | Múltiples claves orphans en chrome.storage           | Una sola clave `prefs` con migración limpia     |
+| Aspect | v1 (Multi AI) | v2 |
+|---|---|---|
+| Language | Plain JS | Strict TypeScript |
+| Build | No build (direct load) | Vite + CRXJS |
+| iframe.js | 4689 lines, everything mixed | UI split into 6 files < 250 lines each |
+| Messages | Untyped postMessage, optional requestId | Typed discriminated unions, requestId always |
+| SiteAdapters | JSON config + scattered JS handlers | One class per site, uniform contract |
+| Stable Synthesis | Polling with "stable response" detection | Instant manual (you choose the moment) |
+| Markdown | textContent (plain text) | Inline parser, code/headers/lists/blockquote |
+| Persistence | Multiple orphan keys in chrome.storage | A single `prefs` key with clean migration |
 
 ## Roadmap (post-MVP)
 
-- Historial de queries y respuestas (chrome.storage.local)
-- Templates de prompts (filtros, formatters)
-- Export a markdown/PDF
-- Más sitios (DeepSeek, Mistral, AI Studio)
-- Tests con Playwright (al menos para los SiteAdapters)
-- File upload paralelo
+- Query and response history (chrome.storage.local)
+- Prompt templates (filters, formatters)
+- Export to markdown/PDF
+- More sites (DeepSeek, Mistral, AI Studio)
+- Tests with Playwright (at least for SiteAdapters)
+- Parallel file upload
 
-## Licencia
+## License
 
-Privado / personal.
+Private / personal.
