@@ -1,38 +1,36 @@
 /**
  * Entry point for the Multi-AI extension page.
+ *
+ * `App` is a thin orchestrator: it builds the UI components and wires them to
+ * three focused managers — PreferencesManager (state), PerplexityBridge
+ * (background-tab messaging) and IframeSubmitController (DOM submit retries).
  */
 
-import { loadPrefs, patchPrefs } from '@/lib/storage';
-import { SITE_IDS, SITES } from '@/sites/registry';
 import { OllamaClient } from '@/synth/ollama';
 import { buildPromptImprovementPrompt } from '@/synth/prompt';
-import type {
-  BackgroundRequest,
-  BackgroundResponse,
-  DisplayMode,
-  SiteId,
-  SiteResponse,
-  SyncedPrefs
-} from '@/types';
+import type { SiteId } from '@/types';
 import { IframesGrid } from './components/IframesGrid';
 import { SearchBar } from './components/SearchBar';
 import { SynthesisModalView, SynthesisPanelView } from './components/SynthesisView';
+import { IframeSubmitController } from './IframeSubmitController';
+import { PerplexityBridge } from './PerplexityBridge';
+import { PreferencesManager } from './state/PreferencesManager';
 import { Synthesizer } from './Synthesizer';
 
 class App {
-  private prefs!: SyncedPrefs;
+  private prefs = new PreferencesManager();
   private searchBar!: SearchBar;
   private grid!: IframesGrid;
   private modalView = new SynthesisModalView();
   private panelView = new SynthesisPanelView();
   private synthesizer!: Synthesizer;
   private ollamaClient = new OllamaClient();
-  private submitTimersBySite = new Map<SiteId, number[]>();
+  private perplexity!: PerplexityBridge;
+  private submitter = new IframeSubmitController();
   private mountedKey = '';
-  private perplexityResponse: SiteResponse | null = null;
 
   async init(): Promise<void> {
-    this.prefs = await loadPrefs();
+    await this.prefs.load();
 
     this.searchBar = new SearchBar({
       onSubmit: (q) => { void this.onSubmit(q); },
@@ -43,9 +41,10 @@ class App {
 
     this.grid = new IframesGrid({
       onOpenPerplexity: () => {
-        void this.openPerplexity(true);
+        void this.perplexity.open(true);
       }
     });
+    this.perplexity = new PerplexityBridge(this.grid);
 
     const root = document.getElementById('app')!;
     root.append(this.searchBar.el, this.grid.el);
@@ -65,9 +64,9 @@ class App {
     const resynthHandler = (selected: SiteId[]) => { void this.synthesizer.rerun(selected); };
     this.modalView.onResynth(resynthHandler);
     this.panelView.onResynth(resynthHandler);
-    window.addEventListener('message', (ev) => this.onFrameMessage(ev));
+    window.addEventListener('message', (ev) => this.submitter.handleAck(ev));
 
-    this.searchBar.setPrefs(this.prefs);
+    this.searchBar.setPrefs(this.prefs.snapshot);
     this.mountGrid();
 
     // Always focus the textarea on load
@@ -78,9 +77,7 @@ class App {
     return new Synthesizer(
       view,
       () => this.prefs.preferredModel,
-      async (m) => {
-        this.prefs = await patchPrefs({ preferredModel: m });
-      }
+      (m) => this.prefs.setPreferredModel(m)
     );
   }
 
@@ -88,12 +85,8 @@ class App {
     return this.prefs.displayMode === 'panel' ? this.panelView : this.modalView;
   }
 
-  private enabledSiteIds(): SiteId[] {
-    return SITE_IDS.filter((id) => this.prefs.enabledSites[id]);
-  }
-
   private mountGrid(): void {
-    const enabled = this.enabledSiteIds();
+    const enabled = this.prefs.enabledSiteIds();
     const key = enabled.join('|');
     if (key === this.mountedKey) return;
     this.grid.mount(enabled);
@@ -137,72 +130,15 @@ class App {
 
     // ── Step 2: send to all AI chats ──────────────────────────────────────────
     this.mountGrid();
-    this.clearSubmitTimers();
-    this.perplexityResponse = null;
+    this.submitter.clearAll();
+    this.perplexity.reset();
 
     this.grid.submitViaUrl(improvedQuery);
-    this.scheduleDomSubmissions(improvedQuery);
+    this.submitter.scheduleSubmissions(this.grid.list(), improvedQuery);
 
-    if (this.prefs.enabledSites.perplexity) {
-      void this.submitPerplexity(improvedQuery);
+    if (this.prefs.isEnabled('perplexity')) {
+      void this.perplexity.submit(improvedQuery);
     }
-  }
-
-  private scheduleDomSubmissions(query: string): void {
-    for (const frame of this.grid.list()) {
-      const site = SITES[frame.siteId];
-      if (site.queryUrlTemplate) continue;
-      this.retrySubmitToFrame(frame.siteId, frame.origin, frame.iframe, query);
-    }
-  }
-
-  private retrySubmitToFrame(
-    siteId: SiteId,
-    origin: string,
-    iframe: HTMLIFrameElement,
-    query: string
-  ): void {
-    const delays =
-      siteId === 'claude' ? [700, 3000, 7000] : [250, 900, 1800, 3200, 5200, 8000, 12000];
-    const requestId = `submit-${siteId}-${Date.now()}`;
-    const timers: number[] = [];
-    this.submitTimersBySite.set(siteId, timers);
-    for (const delay of delays) {
-      const timer = window.setTimeout(() => {
-        iframe.contentWindow?.postMessage(
-          {
-            type: 'MULTIAI_SUBMIT_QUERY',
-            siteId,
-            query,
-            requestId
-          },
-          origin
-        );
-      }, delay);
-      timers.push(timer);
-    }
-  }
-
-  private clearSubmitTimers(): void {
-    for (const timers of this.submitTimersBySite.values()) {
-      for (const timer of timers) window.clearTimeout(timer);
-    }
-    this.submitTimersBySite.clear();
-  }
-
-  private clearSubmitTimersFor(siteId: SiteId): void {
-    const timers = this.submitTimersBySite.get(siteId);
-    if (!timers) return;
-    for (const timer of timers) window.clearTimeout(timer);
-    this.submitTimersBySite.delete(siteId);
-  }
-
-  private onFrameMessage(ev: MessageEvent): void {
-    const msg = ev.data;
-    if (!msg || typeof msg !== 'object') return;
-    if (msg.type !== 'MULTIAI_SUBMIT_ACK') return;
-    if (msg.ok !== true) return;
-    this.clearSubmitTimersFor(msg.siteId);
   }
 
   private async onSynth(): Promise<void> {
@@ -216,7 +152,9 @@ class App {
 
     this.searchBar.setSynthRunning(true);
     try {
-      const extraResponses = await this.perplexityResponseForSynthesis();
+      const extraResponses = this.prefs.isEnabled('perplexity')
+        ? await this.perplexity.responseForSynthesis(this.lastQuery() ?? undefined)
+        : [];
       await this.synthesizer.run(query, this.grid.list(), extraResponses);
     } finally {
       this.searchBar.setSynthRunning(false);
@@ -224,150 +162,20 @@ class App {
   }
 
   private async onToggleSite(siteId: SiteId, enabled: boolean): Promise<void> {
-    this.prefs = await patchPrefs({
-      enabledSites: { ...this.prefs.enabledSites, [siteId]: enabled }
-    });
+    await this.prefs.setSiteEnabled(siteId, enabled);
     this.mountedKey = '';
     this.mountGrid();
   }
 
   private async onToggleMode(): Promise<void> {
-    const next: DisplayMode = this.prefs.displayMode === 'modal' ? 'panel' : 'modal';
-    this.prefs = await patchPrefs({ displayMode: next });
-    this.searchBar.setPrefs(this.prefs);
-  }
-
-  private async submitPerplexity(query: string): Promise<void> {
-    this.grid.setMirrorStatus(
-      'perplexity',
-      'Opening Perplexity in a background tab...',
-      'busy'
-    );
-    this.grid.setMirrorContent('perplexity', 'Waiting for Perplexity response...');
-
-    const submit = await this.sendBackground({
-      type: 'MULTIAI_PERPLEXITY_SUBMIT',
-      query
-    });
-
-    if (!submit.ok) {
-      this.showPerplexityError(submit);
-      return;
-    }
-
-    this.grid.setMirrorStatus('perplexity', 'Query sent. Capturing visible response...', 'busy');
-    await this.pollPerplexityAnswer(query);
-  }
-
-  private async pollPerplexityAnswer(query: string): Promise<SiteResponse | null> {
-    const started = Date.now();
-    let lastText = '';
-    let stableCount = 0;
-    const minCaptureMs = 12000;
-    const stablePollsNeeded = 3;
-
-    while (Date.now() - started < 90000) {
-      await sleep(2500);
-      const extracted = await this.sendBackground({ type: 'MULTIAI_PERPLEXITY_EXTRACT', query });
-
-      if (!extracted.ok) {
-        if (extracted.needsUserAction) {
-          this.showPerplexityError(extracted);
-          return null;
-        }
-        this.grid.setMirrorStatus(
-          'perplexity',
-          extracted.error ?? 'Waiting for Perplexity response...',
-          'busy'
-        );
-        continue;
-      }
-
-      const text = extracted.text?.trim() ?? '';
-      if (!text) continue;
-
-      const elapsed = Date.now() - started;
-      const changed = text !== lastText;
-      if (changed) stableCount = 0;
-      else stableCount += 1;
-      lastText = text;
-
-      this.grid.setMirrorContent('perplexity', text);
-      const ready = elapsed >= minCaptureMs && stableCount >= stablePollsNeeded;
-      this.grid.setMirrorStatus(
-        'perplexity',
-        ready
-          ? 'Response ready to synthesize.'
-          : `Capturing Perplexity... ${text.length.toLocaleString()} characters`,
-        ready ? 'ok' : 'busy'
-      );
-
-      if (ready) {
-        this.perplexityResponse = { siteId: 'perplexity', text };
-        return this.perplexityResponse;
-      }
-    }
-
-    if (lastText) {
-      this.perplexityResponse = { siteId: 'perplexity', text: lastText };
-      this.grid.setMirrorStatus('perplexity', 'Timeout; using partial response.', 'ok');
-      return this.perplexityResponse;
-    }
-
-    this.grid.setMirrorStatus('perplexity', 'Could not capture Perplexity response.', 'fail');
-    return null;
-  }
-
-  private async perplexityResponseForSynthesis(): Promise<SiteResponse[]> {
-    if (!this.prefs.enabledSites.perplexity) return [];
-    if (this.perplexityResponse?.text) return [this.perplexityResponse];
-
-    const extracted = await this.sendBackground({
-      type: 'MULTIAI_PERPLEXITY_EXTRACT',
-      query: this.lastQuery() ?? undefined
-    });
-    if (extracted.ok && extracted.text?.trim()) {
-      this.perplexityResponse = { siteId: 'perplexity', text: extracted.text.trim() };
-      this.grid.setMirrorContent('perplexity', this.perplexityResponse.text);
-      this.grid.setMirrorStatus('perplexity', 'Response captured for synthesis.', 'ok');
-      return [this.perplexityResponse];
-    }
-    return [];
-  }
-
-  private async openPerplexity(active: boolean): Promise<void> {
-    const response = await this.sendBackground({ type: 'MULTIAI_PERPLEXITY_OPEN', active });
-    if (!response.ok) this.showPerplexityError(response);
-  }
-
-  private showPerplexityError(response: BackgroundResponse): void {
-    const message = response.needsUserAction
-      ? 'Perplexity requires human verification. Use "Open", resolve it once, and return to the extension.'
-      : response.error ?? 'Could not use Perplexity.';
-    this.grid.setMirrorStatus('perplexity', message, 'fail');
-    this.grid.setMirrorContent('perplexity', message);
-  }
-
-  private async sendBackground(message: BackgroundRequest): Promise<BackgroundResponse> {
-    try {
-      return (await chrome.runtime.sendMessage(message)) as BackgroundResponse;
-    } catch (error) {
-      return {
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-        needsUserAction: false
-      };
-    }
+    await this.prefs.toggleDisplayMode();
+    this.searchBar.setPrefs(this.prefs.snapshot);
   }
 
   private lastQuery(): string | null {
     const ta = document.querySelector<HTMLTextAreaElement>('.search-bar textarea');
     return ta?.value.trim() || null;
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 document.addEventListener('DOMContentLoaded', () => {
