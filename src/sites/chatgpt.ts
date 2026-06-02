@@ -5,13 +5,16 @@ import {
   textOfAll,
   typeIntoContentEditable,
   typeIntoNativeInput,
+  waitAndClickSubmit,
   waitForAny
 } from './dom-utils';
+
+const SCOPE_SELECTORS = ['form', '[data-testid*="composer"], [class*="composer"], main'] as const;
 
 /**
  * ChatGPT uses ProseMirror (contenteditable). The compose box has a `#prompt-textarea`
  * id even though it may be a div[contenteditable]. Submit button is disabled until
- * React registers the input, so we poll with waitAndClickFirst.
+ * React registers the input, so we poll with waitAndClickSubmit.
  */
 const COMPOSE_SELECTORS = [
   'textarea#prompt-textarea',
@@ -61,7 +64,6 @@ export const chatgptAdapter: SiteAdapter = {
       (await waitForAny<HTMLElement>(COMPOSE_SELECTORS, { timeout: 15000 })) ??
       querySelectorAny<HTMLElement>(COMPOSE_SELECTORS);
     if (!target) throw new Error('ChatGPT: compose box not found');
-    console.info('[multiai] ChatGPT composer found:', target.tagName, target.id || target.className);
 
     if (target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement) {
       typeIntoNativeInput(target, query);
@@ -69,10 +71,12 @@ export const chatgptAdapter: SiteAdapter = {
       typeIntoContentEditable(target, query);
     }
 
-    const clicked = await clickChatGptSend(target, 5000);
-    console.info('[multiai] ChatGPT submit clicked:', clicked);
+    const clicked = await waitAndClickSubmit(
+      target,
+      { selectors: SUBMIT_SELECTORS, scopeSelectors: SCOPE_SELECTORS },
+      { timeout: 5000 }
+    );
     if (!clicked) {
-      console.info('[multiai] ChatGPT falling back to Enter');
       target.focus();
       pressEnter(target);
     }
@@ -85,60 +89,3 @@ export const chatgptAdapter: SiteAdapter = {
   }
 };
 
-async function clickChatGptSend(target: HTMLElement, timeout: number): Promise<boolean> {
-  const deadline = performance.now() + timeout;
-  return new Promise((resolve) => {
-    const attempt = () => {
-      const btn = findSendButtonNear(target);
-      if (btn) {
-        btn.click();
-        return resolve(true);
-      }
-      if (performance.now() > deadline) return resolve(false);
-      requestAnimationFrame(attempt);
-    };
-    attempt();
-  });
-}
-
-function findSendButtonNear(target: HTMLElement): HTMLButtonElement | null {
-  const scopes: ParentNode[] = [];
-  const form = target.closest('form');
-  if (form) scopes.push(form);
-  const composer = target.closest('[data-testid*="composer"], [class*="composer"], main');
-  if (composer && composer !== form) scopes.push(composer);
-  scopes.push(document);
-
-  for (const scope of scopes) {
-    for (const selector of SUBMIT_SELECTORS) {
-      const buttons = Array.from(scope.querySelectorAll<HTMLButtonElement>(selector));
-      const found = buttons.find((button) => isUsableSendButton(button));
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-function isUsableSendButton(button: HTMLButtonElement): boolean {
-  const label = [
-    button.getAttribute('aria-label') ?? '',
-    button.getAttribute('data-testid') ?? '',
-    button.title ?? '',
-    button.textContent ?? ''
-  ]
-    .join(' ')
-    .toLowerCase();
-
-  const looksLikeSend =
-    label.includes('send') ||
-    label.includes('submit') ||
-    label.includes('composer-send') ||
-    label.includes('send-button');
-
-  if (!looksLikeSend && button.type !== 'submit') return false;
-  if (button.disabled || button.getAttribute('aria-disabled') === 'true') return false;
-
-  const rect = button.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return false;
-  return true;
-}

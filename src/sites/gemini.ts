@@ -1,11 +1,13 @@
 import type { SiteAdapter } from '@/types';
 import {
-  clickFirst,
   querySelectorAny,
   textOfAll,
   typeIntoContentEditable,
+  waitAndClickSubmit,
   waitFor
 } from './dom-utils';
+
+const SCOPE_SELECTORS = ['form', '[class*="input-area"], [class*="text-input"], main'] as const;
 
 /**
  * Gemini uses an Angular-driven contenteditable inside <rich-textarea>.
@@ -48,7 +50,12 @@ export const geminiAdapter: SiteAdapter = {
     if (!target) throw new Error('Gemini: compose box not found');
     typeIntoContentEditable(target, query);
     await new Promise((r) => setTimeout(r, 100));
-    if (!clickFirst(SUBMIT_SELECTORS)) {
+    const clicked = await waitAndClickSubmit(
+      target,
+      { selectors: SUBMIT_SELECTORS, scopeSelectors: SCOPE_SELECTORS },
+      { timeout: 1500 }
+    );
+    if (!clicked) {
       target.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
       );

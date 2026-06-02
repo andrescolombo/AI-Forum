@@ -28,6 +28,7 @@ const adapter = adapterForUrl(new URL(location.href));
 
 if (adapter) {
   const handledSubmits = new Set<string>();
+  const pendingSubmits = new Set<string>();
 
   const reply = <M extends AnswerExtractedMessage | ContentReadyMessage | SubmitAckMessage>(msg: M) => {
     // The parent UI (extension page) is window.parent for an iframe.
@@ -55,6 +56,13 @@ if (adapter) {
         });
         return;
       }
+      // A submit for this requestId is still running. The parent retries faster
+      // than submitQuery completes; ignore the duplicate so concurrent runs
+      // don't re-type into the composer and corrupt it. The in-flight run will
+      // ACK when it finishes.
+      if (pendingSubmits.has(msg.requestId)) return;
+
+      pendingSubmits.add(msg.requestId);
       let ok = true;
       try {
         await adapter.submitQuery(msg.query);
@@ -62,6 +70,8 @@ if (adapter) {
       } catch (err) {
         ok = false;
         console.warn('[multiai]', adapter.id, 'submitQuery failed:', err);
+      } finally {
+        pendingSubmits.delete(msg.requestId);
       }
       reply<SubmitAckMessage>({
         type: 'MULTIAI_SUBMIT_ACK',

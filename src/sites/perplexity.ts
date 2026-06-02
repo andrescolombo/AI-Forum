@@ -5,9 +5,11 @@ import {
   textOfAll,
   typeIntoContentEditable,
   typeIntoNativeInput,
-  waitAndClickFirst,
+  waitAndClickSubmit,
   waitFor
 } from './dom-utils';
+
+const SCOPE_SELECTORS = ['form', 'main'] as const;
 
 /**
  * Perplexity sometimes accepts query-via-URL, but it is not reliable for actual
@@ -59,7 +61,11 @@ export const perplexityAdapter: SiteAdapter = {
       typeIntoContentEditable(target, query);
     }
 
-    const clicked = await waitAndClickFirst(SUBMIT_SELECTORS, { timeout: 2000 });
+    const clicked = await waitAndClickSubmit(
+      target,
+      { selectors: SUBMIT_SELECTORS, scopeSelectors: SCOPE_SELECTORS },
+      { timeout: 2000 }
+    );
     if (!clicked) pressEnter(target);
   },
 

@@ -4,8 +4,14 @@ import {
   requestSubmitNear,
   textOfAll,
   typeIntoContentEditable,
+  waitAndClickSubmit,
   waitForAny
 } from './dom-utils';
+
+const SCOPE_SELECTORS = [
+  'form, fieldset, [data-testid*="composer"], [class*="composer"]',
+  '[class*="composer"], [data-testid*="composer"], [class*="input"], main'
+] as const;
 
 const COMPOSE_SELECTORS = [
   '.tiptap.ProseMirror',
@@ -58,9 +64,24 @@ export const claudeAdapter: SiteAdapter = {
     await waitForComposerText(target, query, 2500);
     await sleep(250);
 
-    const sent = await clickClaudeSend(target, 8000);
-    if (!sent && !requestSubmitNear(target)) {
+    // Click the send button once it's actually enabled (Claude enables it only
+    // after the composer has registered the inserted text). We deliberately do
+    // NOT fall back to a synthetic Enter keydown: Claude's editor ignores
+    // untrusted keyboard events for "send" and inserts a newline instead.
+    const clicked = await waitAndClickSubmit(
+      target,
+      { selectors: SUBMIT_SELECTORS, scopeSelectors: SCOPE_SELECTORS },
+      { timeout: 6000 }
+    );
+    if (!clicked && !requestSubmitNear(target)) {
       throw new Error('Claude: send button not found or still disabled');
+    }
+
+    // Confirm the prompt actually left the composer; if it's still there,
+    // throw so the parent's retry loop tries again.
+    const submitted = await waitForComposerCleared(target, 4000);
+    if (!submitted) {
+      throw new Error('Claude: message did not submit');
     }
   },
 
@@ -74,89 +95,6 @@ export const claudeAdapter: SiteAdapter = {
   }
 };
 
-async function clickClaudeSend(target: HTMLElement, timeout: number): Promise<boolean> {
-  const deadline = performance.now() + timeout;
-  return new Promise((resolve) => {
-    const attempt = () => {
-      const btn = findSendButtonNear(target);
-      if (btn) {
-        clickLikeUser(btn);
-        return resolve(true);
-      }
-      if (performance.now() > deadline) return resolve(false);
-      requestAnimationFrame(attempt);
-    };
-    attempt();
-  });
-}
-
-function findSendButtonNear(target: HTMLElement): HTMLButtonElement | null {
-  const scopes: ParentNode[] = [];
-  const form = target.closest('form, fieldset, [data-testid*="composer"], [class*="composer"]');
-  if (form) scopes.push(form);
-  const composer = target.closest('[class*="composer"], [data-testid*="composer"], [class*="input"], main');
-  if (composer && composer !== form) scopes.push(composer);
-  scopes.push(document);
-
-  for (const scope of scopes) {
-    for (const selector of SUBMIT_SELECTORS) {
-      const buttons = Array.from(scope.querySelectorAll<HTMLButtonElement>(selector));
-      const found = buttons.find((button) => isUsableSendButton(button));
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-function isUsableSendButton(button: HTMLButtonElement): boolean {
-  const label = [
-    button.getAttribute('aria-label') ?? '',
-    button.getAttribute('data-testid') ?? '',
-    button.title ?? '',
-    button.textContent ?? ''
-  ]
-    .join(' ')
-    .toLowerCase();
-
-  const looksLikeSend =
-    label.includes('send') ||
-    label.includes('envoyer') ||
-    label.includes('submit') ||
-    label.includes('chat-submit') ||
-    label.includes('composer-send');
-
-  if (button.disabled || button.getAttribute('aria-disabled') === 'true') return false;
-
-  const rect = button.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return false;
-  if (looksLikeBadButton(label)) return false;
-
-  if (looksLikeSend || button.type === 'submit') return true;
-
-  // Claude sometimes ships the arrow button with no accessible label. In the
-  // composer scope, the send control is usually a compact square-ish button on
-  // the right side. This avoids relying only on labels.
-  const squareish = rect.width >= 24 && rect.width <= 64 && rect.height >= 24 && rect.height <= 64;
-  const rightSide = rect.left > window.innerWidth * 0.45;
-  return squareish && rightSide;
-}
-
-function looksLikeBadButton(label: string): boolean {
-  return (
-    label.includes('attach') ||
-    label.includes('upload') ||
-    label.includes('file') ||
-    label.includes('mic') ||
-    label.includes('voice') ||
-    label.includes('dictate') ||
-    label.includes('search') ||
-    label.includes('tool') ||
-    label.includes('share') ||
-    label.includes('copy') ||
-    label.includes('more')
-  );
-}
-
 async function waitForComposerText(target: HTMLElement, query: string, timeout: number): Promise<void> {
   const expected = normalizeText(query).slice(0, 80);
   const deadline = performance.now() + timeout;
@@ -168,18 +106,14 @@ async function waitForComposerText(target: HTMLElement, query: string, timeout: 
   }
 }
 
-function clickLikeUser(button: HTMLButtonElement): void {
-  button.focus();
-  const eventInit: MouseEventInit = {
-    bubbles: true,
-    cancelable: true,
-    view: window
-  };
-  button.dispatchEvent(new PointerEvent('pointerdown', eventInit));
-  button.dispatchEvent(new MouseEvent('mousedown', eventInit));
-  button.dispatchEvent(new PointerEvent('pointerup', eventInit));
-  button.dispatchEvent(new MouseEvent('mouseup', eventInit));
-  button.dispatchEvent(new MouseEvent('click', eventInit));
+async function waitForComposerCleared(target: HTMLElement, timeout: number): Promise<boolean> {
+  const deadline = performance.now() + timeout;
+  while (performance.now() < deadline) {
+    const current = normalizeText(target.innerText || target.textContent || '');
+    if (current.length === 0) return true;
+    await sleep(150);
+  }
+  return false;
 }
 
 function normalizeText(value: string): string {
