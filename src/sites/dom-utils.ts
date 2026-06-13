@@ -124,52 +124,217 @@ export function typeIntoNativeInput(
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-function isActuallyDisabled(btn: HTMLButtonElement): boolean {
-  return (
-    btn.disabled ||
-    btn.getAttribute('aria-disabled') === 'true' ||
-    btn.dataset.disabled === 'true' ||
-    btn.classList.contains('disabled')
-  );
+/** "send"/"submit" words across the languages our target sites localize into. */
+const SEND_WORDS = ['send', 'submit', 'enviar', 'envoyer', 'invia', 'senden'] as const;
+
+/**
+ * Utility controls that live in a composer but are NOT the send button.
+ * Includes localized labels (Spanish, etc.) because the sites are tested in
+ * non-English locales — e.g. ChatGPT's voice button reads "iniciar voz".
+ */
+const UTILITY_WORDS = [
+  // English
+  'attach',
+  'upload',
+  'file',
+  'mic',
+  'voice',
+  'dictate',
+  'search',
+  'tool',
+  'share',
+  'copy',
+  'more',
+  'model',
+  'setting',
+  'menu',
+  'emoji',
+  // Spanish
+  'voz',
+  'dictado',
+  'dictar',
+  'micro',
+  'adjuntar',
+  'subir',
+  'cargar',
+  'archivo',
+  'buscar',
+  'herramienta',
+  'compartir',
+  'copiar',
+  'modelo',
+  'ajuste',
+  'config'
+] as const;
+
+/**
+ * Words for the "stop generating" control. While a site streams its answer the
+ * send button is replaced by a stop button at the same spot; the bottom-right
+ * heuristic would otherwise click it (e.g. Claude's "detener respuesta"),
+ * cancelling the response. Never treat these as a submit button.
+ */
+const STOP_WORDS = ['stop', 'detener', 'parar', 'cancelar', 'cancel'] as const;
+
+export interface SubmitButtonOptions {
+  /** Site-specific selectors for the send button, tried first (most reliable). */
+  selectors: readonly string[];
+  /** Composer container selectors to scope the search; document is the last resort. */
+  scopeSelectors?: readonly string[];
+  /**
+   * Whether to fall back to the bottom-right heuristic when no explicit selector
+   * matches. Default true. Disable for sites whose send button is reliably
+   * identified by selectors and whose composer has look-alike controls (e.g.
+   * ChatGPT's model selector / temporary-chat toggle).
+   */
+  useHeuristicFallback?: boolean;
 }
 
-function isVisible(el: HTMLElement): boolean {
-  const rect = el.getBoundingClientRect();
+function labelOf(button: HTMLButtonElement): string {
+  return [
+    button.getAttribute('aria-label') ?? '',
+    button.getAttribute('data-testid') ?? '',
+    button.title ?? '',
+    button.textContent ?? ''
+  ]
+    .join(' ')
+    .toLowerCase();
+}
+
+function isClickable(button: HTMLButtonElement): boolean {
+  if (
+    button.disabled ||
+    button.getAttribute('aria-disabled') === 'true' ||
+    button.dataset.disabled === 'true' ||
+    button.classList.contains('disabled')
+  ) {
+    return false;
+  }
+  const rect = button.getBoundingClientRect();
   return rect.width > 0 && rect.height > 0;
 }
 
-function findClickableButton(selectors: readonly string[]): HTMLButtonElement | null {
-  for (const sel of selectors) {
-    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(sel));
-    const btn = buttons.find((candidate) => isVisible(candidate) && !isActuallyDisabled(candidate));
-    if (btn) return btn;
+function isUtilityButton(label: string): boolean {
+  return UTILITY_WORDS.some((word) => label.includes(word));
+}
+
+function isStopButton(label: string): boolean {
+  return STOP_WORDS.some((word) => label.includes(word));
+}
+
+/** A button that must never be chosen as the send/submit control. */
+function isNonSubmitButton(label: string): boolean {
+  return isUtilityButton(label) || isStopButton(label);
+}
+
+/**
+ * A button that opens a menu/popup (e.g. ChatGPT's model selector, tool pickers)
+ * is never the send control. Keying on `aria-haspopup` is locale-independent and
+ * avoids grabbing a dropdown trigger that happens to default to `type="submit"`
+ * and is clickable before the real send button is enabled.
+ */
+function opensMenu(button: HTMLButtonElement): boolean {
+  const hasPopup = button.getAttribute('aria-haspopup');
+  return hasPopup !== null && hasPopup !== 'false';
+}
+
+function buildScopes(target: HTMLElement, scopeSelectors?: readonly string[]): ParentNode[] {
+  const scopes: ParentNode[] = [];
+  for (const selector of scopeSelectors ?? []) {
+    const el = target.closest(selector);
+    if (el && !scopes.includes(el)) scopes.push(el);
+  }
+  scopes.push(document);
+  return scopes;
+}
+
+/**
+ * Find a site's send/submit button near the composer, resilient to localized
+ * labels (e.g. Claude's "Enviar mensaje" in Spanish). Strategy:
+ *   1. Trust the site-specific `selectors` (most reliable: data-testid, class).
+ *   2. Fallback: an enabled, non-utility button that either carries a known send
+ *      word (any language) or sits at the composer's bottom-right edge.
+ */
+export function findSubmitButton(
+  target: HTMLElement,
+  { selectors, scopeSelectors, useHeuristicFallback = true }: SubmitButtonOptions
+): HTMLButtonElement | null {
+  const scopes = buildScopes(target, scopeSelectors);
+
+  for (const scope of scopes) {
+    for (const selector of selectors) {
+      const found = Array.from(scope.querySelectorAll<HTMLButtonElement>(selector)).find(
+        (button) => isClickable(button) && !opensMenu(button) && !isNonSubmitButton(labelOf(button))
+      );
+      if (found) return found;
+    }
+  }
+
+  if (!useHeuristicFallback) return null;
+
+  for (const scope of scopes) {
+    const candidate = pickSubmitByHeuristic(
+      Array.from(scope.querySelectorAll<HTMLButtonElement>('button'))
+    );
+    if (candidate) return candidate;
   }
   return null;
 }
 
-/** Click a button by trying a list of selectors. Returns true if it clicked. */
-export function clickFirst(selectors: readonly string[]): boolean {
-  const btn = findClickableButton(selectors);
-  if (!btn) return false;
-  btn.click();
-  return true;
+function pickSubmitByHeuristic(buttons: HTMLButtonElement[]): HTMLButtonElement | null {
+  const usable = buttons.filter(
+    (button) => isClickable(button) && !opensMenu(button) && !isNonSubmitButton(labelOf(button))
+  );
+  if (usable.length === 0) return null;
+
+  // Prefer a button with an explicit (possibly localized) send word in its label.
+  // We deliberately do NOT match on `type === 'submit'`: a <button> with no type
+  // attribute defaults to "submit", which would wrongly grab unrelated buttons
+  // (e.g. Gemini's top-left menu button).
+  const labeled = usable.find((button) =>
+    SEND_WORDS.some((word) => labelOf(button).includes(word))
+  );
+  if (labeled) return labeled;
+
+  // Otherwise the unlabeled send arrow at the composer's bottom-right corner.
+  const rightSide = usable.filter(
+    (button) => button.getBoundingClientRect().left > window.innerWidth * 0.45
+  );
+  if (rightSide.length === 0) return null;
+  return rightSide.reduce((best, button) => {
+    const r = button.getBoundingClientRect();
+    const br = best.getBoundingClientRect();
+    return r.left + r.top > br.left + br.top ? button : best;
+  });
 }
 
 /**
- * Poll until a button matching one of the selectors becomes enabled, then click it.
- * Needed for React/ProseMirror editors where the send button stays disabled for a
- * few frames after content is inserted, until React re-renders.
+ * Activate a button like a user: a pointer/mouse press sequence (for frameworks
+ * that listen for pointer events) followed by a native `.click()`. The native
+ * click is essential — a synthetic 'click' event does NOT trigger a button's
+ * default action (e.g. submitting its form), which some sites rely on.
  */
-export async function waitAndClickFirst(
-  selectors: readonly string[],
-  { timeout = 2000 }: { timeout?: number } = {}
+export function clickLikeUser(button: HTMLElement): void {
+  button.focus();
+  const init: MouseEventInit = { bubbles: true, cancelable: true, view: window };
+  button.dispatchEvent(new PointerEvent('pointerdown', init));
+  button.dispatchEvent(new MouseEvent('mousedown', init));
+  button.dispatchEvent(new PointerEvent('pointerup', init));
+  button.dispatchEvent(new MouseEvent('mouseup', init));
+  button.click();
+}
+
+/** Poll until the submit button is found, then click it. Returns whether it clicked. */
+export async function waitAndClickSubmit(
+  target: HTMLElement,
+  options: SubmitButtonOptions,
+  { timeout = 5000 }: { timeout?: number } = {}
 ): Promise<boolean> {
   const deadline = performance.now() + timeout;
   return new Promise((resolve) => {
     const attempt = () => {
-      const btn = findClickableButton(selectors);
+      const btn = findSubmitButton(target, options);
       if (btn) {
-        btn.click();
+        clickLikeUser(btn);
         return resolve(true);
       }
       if (performance.now() > deadline) return resolve(false);

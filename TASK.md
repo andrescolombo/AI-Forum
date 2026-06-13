@@ -26,9 +26,13 @@
 
 ## Backlog / Architecture Improvements
 
-- [ ] **Decouple the "God Node" (`App.ts`)**: Split `App` into smaller, focused managers (e.g., `Orchestrator` for UI/Iframes and `PreferencesManager` for state) to improve maintainability.
-- [ ] **Standardize the Background Bridge**: Abstract the `handlePerplexityMessage` background tab logic into a generic `OffscreenTabAdapter` to easily support future sites that block iframes (e.g., DeepSeek, AI Studio).
+- [x] **Decouple the "God Node" (`App.ts`)**: Split `App` into smaller, focused managers (e.g., `Orchestrator` for UI/Iframes and `PreferencesManager` for state) to improve maintainability. *(Done: `App` in `src/ui/main.ts` is now a thin orchestrator delegating to `PreferencesManager` (state), `PerplexityBridge` (background-tab messaging) and `IframeSubmitController` (DOM submit retries).)*
+- [x] **Standardize the Background Bridge**: Abstract the `handlePerplexityMessage` background tab logic into a generic `OffscreenTabAdapter` to easily support future sites that block iframes (e.g., DeepSeek, AI Studio). *(Done: generic engine in `src/background/offscreen-tab.ts` + per-site adapter `offscreen-perplexity.ts`; generic `MULTIAI_OFFSCREEN_*` protocol; `PerplexityBridge` → `OffscreenBridge` parameterized by `siteId`. Adding a new iframe-hostile site = register an adapter in `OFFSCREEN_ADAPTERS`. Verified live: Perplexity submit/capture/synthesis works.)*
 - [ ] **Resolve Isolated Nodes (Types)**: Centralize scattered discriminated unions (like `SubmitQueryMessage`) into a single `types/messages.ts` registry to improve type-safety and discoverability.
 - [ ] **Add Ollama Health Check UI**: Implement a status indicator/graceful degradation if Ollama (`localhost:11434`) is not running, improving the onboarding experience before public release.
-- [ ] **Increase SiteAdapter Cohesion**: Refactor adapters (e.g., ChatGPT) by splitting brittle DOM selectors (`ANSWER_SELECTORS`, `COMPOSE_SELECTORS`) into a separate `.config.ts` file, separating configuration from execution logic.
+- [ ] **Increase SiteAdapter Cohesion**: Refactor adapters (e.g., ChatGPT) by splitting brittle DOM selectors (`ANSWER_SELECTORS`, `COMPOSE_SELECTORS`) into a separate `.config.ts` file, separating configuration from execution logic. *(Partial: duplicated send-button detection across all four adapters consolidated into a single locale-resilient `findSubmitButton`/`waitAndClickSubmit` in `dom-utils.ts`. The `.config.ts` selector split is still pending.)*
 - [ ] **Implement Playwright Tests**: Add a minimal end-to-end test suite for the `SiteAdapters` to ensure UI changes in target AI sites don't break the extension silently (required by `AGENTS.md`).
+- [ ] **Customizable Prompt Improvement Template**: Provide an option in the extension UI/preferences to edit the prompt optimization instructions (system instructions) sent to Ollama, allowing custom tuning of prompt improvements.
+- [ ] **Expandable Prompt Input Height**: Modify the prompt input box to have a default/minimum height of 3 or 4 lines with scroll support, preventing it from remaining a single line when writing longer queries.
+
+

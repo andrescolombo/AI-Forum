@@ -77,7 +77,7 @@ export function buildSynthesisPrompt(query: string, responses: SiteResponse[]): 
 export function buildPromptImprovementPrompt(query: string): string {
   return [
     'You are an expert in prompt engineering.',
-    'Your only task is to take the user\\'s question and rewrite it as a more effective prompt for large language models.',
+    'Your only task is to take the user\'s question and rewrite it as a more effective prompt for large language models.',
     '',
     'Strict rules:',
     '- Be specific, clear, and well-structured.',
