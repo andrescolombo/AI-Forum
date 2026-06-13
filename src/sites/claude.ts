@@ -79,7 +79,7 @@ export const claudeAdapter: SiteAdapter = {
 
     // Confirm the prompt actually left the composer; if it's still there,
     // throw so the parent's retry loop tries again.
-    const submitted = await waitForComposerCleared(target, 4000);
+    const submitted = await waitForSubmitted(query, 5000);
     if (!submitted) {
       throw new Error('Claude: message did not submit');
     }
@@ -106,11 +106,25 @@ async function waitForComposerText(target: HTMLElement, query: string, timeout: 
   }
 }
 
-async function waitForComposerCleared(target: HTMLElement, timeout: number): Promise<boolean> {
+/**
+ * Decide whether the message was actually submitted. Two positive signals:
+ *  - A streaming/stop indicator appeared (Claude is generating → it was sent).
+ *    `div[data-is-streaming="true"]` is locale-independent, unlike the Stop
+ *    button's aria-label which is localized ("Detener respuesta").
+ *  - The LIVE composer no longer holds our text. We re-query the composer each
+ *    tick rather than trusting the original node: Claude remounts the composer
+ *    on send, leaving the old node detached with stale text (which made the
+ *    previous "is the original target empty?" check false-negative forever and
+ *    drove the retry loop to re-type mid-answer).
+ */
+async function waitForSubmitted(query: string, timeout: number): Promise<boolean> {
+  const expected = normalizeText(query).slice(0, 80);
   const deadline = performance.now() + timeout;
   while (performance.now() < deadline) {
-    const current = normalizeText(target.innerText || target.textContent || '');
-    if (current.length === 0) return true;
+    if (querySelectorAny(STREAMING_SELECTORS)) return true;
+    const live = querySelectorAny<HTMLElement>(COMPOSE_SELECTORS);
+    const current = normalizeText(live?.innerText || live?.textContent || '');
+    if (current.length === 0 || (expected && !current.includes(expected))) return true;
     await sleep(150);
   }
   return false;

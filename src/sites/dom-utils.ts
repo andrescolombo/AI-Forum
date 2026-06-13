@@ -127,8 +127,13 @@ export function typeIntoNativeInput(
 /** "send"/"submit" words across the languages our target sites localize into. */
 const SEND_WORDS = ['send', 'submit', 'enviar', 'envoyer', 'invia', 'senden'] as const;
 
-/** Utility controls that live in a composer but are NOT the send button. */
+/**
+ * Utility controls that live in a composer but are NOT the send button.
+ * Includes localized labels (Spanish, etc.) because the sites are tested in
+ * non-English locales — e.g. ChatGPT's voice button reads "iniciar voz".
+ */
 const UTILITY_WORDS = [
+  // English
   'attach',
   'upload',
   'file',
@@ -143,14 +148,45 @@ const UTILITY_WORDS = [
   'model',
   'setting',
   'menu',
-  'emoji'
+  'emoji',
+  // Spanish
+  'voz',
+  'dictado',
+  'dictar',
+  'micro',
+  'adjuntar',
+  'subir',
+  'cargar',
+  'archivo',
+  'buscar',
+  'herramienta',
+  'compartir',
+  'copiar',
+  'modelo',
+  'ajuste',
+  'config'
 ] as const;
+
+/**
+ * Words for the "stop generating" control. While a site streams its answer the
+ * send button is replaced by a stop button at the same spot; the bottom-right
+ * heuristic would otherwise click it (e.g. Claude's "detener respuesta"),
+ * cancelling the response. Never treat these as a submit button.
+ */
+const STOP_WORDS = ['stop', 'detener', 'parar', 'cancelar', 'cancel'] as const;
 
 export interface SubmitButtonOptions {
   /** Site-specific selectors for the send button, tried first (most reliable). */
   selectors: readonly string[];
   /** Composer container selectors to scope the search; document is the last resort. */
   scopeSelectors?: readonly string[];
+  /**
+   * Whether to fall back to the bottom-right heuristic when no explicit selector
+   * matches. Default true. Disable for sites whose send button is reliably
+   * identified by selectors and whose composer has look-alike controls (e.g.
+   * ChatGPT's model selector / temporary-chat toggle).
+   */
+  useHeuristicFallback?: boolean;
 }
 
 function labelOf(button: HTMLButtonElement): string {
@@ -181,6 +217,26 @@ function isUtilityButton(label: string): boolean {
   return UTILITY_WORDS.some((word) => label.includes(word));
 }
 
+function isStopButton(label: string): boolean {
+  return STOP_WORDS.some((word) => label.includes(word));
+}
+
+/** A button that must never be chosen as the send/submit control. */
+function isNonSubmitButton(label: string): boolean {
+  return isUtilityButton(label) || isStopButton(label);
+}
+
+/**
+ * A button that opens a menu/popup (e.g. ChatGPT's model selector, tool pickers)
+ * is never the send control. Keying on `aria-haspopup` is locale-independent and
+ * avoids grabbing a dropdown trigger that happens to default to `type="submit"`
+ * and is clickable before the real send button is enabled.
+ */
+function opensMenu(button: HTMLButtonElement): boolean {
+  const hasPopup = button.getAttribute('aria-haspopup');
+  return hasPopup !== null && hasPopup !== 'false';
+}
+
 function buildScopes(target: HTMLElement, scopeSelectors?: readonly string[]): ParentNode[] {
   const scopes: ParentNode[] = [];
   for (const selector of scopeSelectors ?? []) {
@@ -200,18 +256,20 @@ function buildScopes(target: HTMLElement, scopeSelectors?: readonly string[]): P
  */
 export function findSubmitButton(
   target: HTMLElement,
-  { selectors, scopeSelectors }: SubmitButtonOptions
+  { selectors, scopeSelectors, useHeuristicFallback = true }: SubmitButtonOptions
 ): HTMLButtonElement | null {
   const scopes = buildScopes(target, scopeSelectors);
 
   for (const scope of scopes) {
     for (const selector of selectors) {
       const found = Array.from(scope.querySelectorAll<HTMLButtonElement>(selector)).find(
-        (button) => isClickable(button) && !isUtilityButton(labelOf(button))
+        (button) => isClickable(button) && !opensMenu(button) && !isNonSubmitButton(labelOf(button))
       );
       if (found) return found;
     }
   }
+
+  if (!useHeuristicFallback) return null;
 
   for (const scope of scopes) {
     const candidate = pickSubmitByHeuristic(
@@ -224,7 +282,7 @@ export function findSubmitButton(
 
 function pickSubmitByHeuristic(buttons: HTMLButtonElement[]): HTMLButtonElement | null {
   const usable = buttons.filter(
-    (button) => isClickable(button) && !isUtilityButton(labelOf(button))
+    (button) => isClickable(button) && !opensMenu(button) && !isNonSubmitButton(labelOf(button))
   );
   if (usable.length === 0) return null;
 

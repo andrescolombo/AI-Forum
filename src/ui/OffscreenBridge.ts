@@ -1,16 +1,21 @@
-import type { BackgroundRequest, BackgroundResponse, SiteResponse } from '@/types';
+import { SITES } from '@/sites/registry';
+import type { BackgroundRequest, BackgroundResponse, SiteId, SiteResponse } from '@/types';
 import type { IframesGrid } from './components/IframesGrid';
 
 /**
  * Encapsulates all communication with the background service worker that drives
- * Perplexity in a hidden browser tab (Perplexity blocks iframe embedding). Owns
- * the captured response so both the submit flow and a later synthesis run can
- * reuse it without re-extracting.
+ * an iframe-hostile AI site (e.g. Perplexity) in a hidden browser tab. Owns the
+ * captured response so both the submit flow and a later synthesis run can reuse
+ * it without re-extracting. Parameterized by `siteId`, so any site registered as
+ * an offscreen adapter in the service worker can be driven through one instance.
  */
-export class PerplexityBridge {
+export class OffscreenBridge {
   private response: SiteResponse | null = null;
+  private readonly displayName: string;
 
-  constructor(private grid: IframesGrid) {}
+  constructor(private grid: IframesGrid, private siteId: SiteId) {
+    this.displayName = SITES[siteId].displayName;
+  }
 
   /** Forget the last captured response (called at the start of a new submit). */
   reset(): void {
@@ -19,14 +24,15 @@ export class PerplexityBridge {
 
   async submit(query: string): Promise<void> {
     this.grid.setMirrorStatus(
-      'perplexity',
-      'Opening Perplexity in a background tab...',
+      this.siteId,
+      `Opening ${this.displayName} in a background tab...`,
       'busy'
     );
-    this.grid.setMirrorContent('perplexity', 'Waiting for Perplexity response...');
+    this.grid.setMirrorContent(this.siteId, `Waiting for ${this.displayName} response...`);
 
     const submit = await this.sendBackground({
-      type: 'MULTIAI_PERPLEXITY_SUBMIT',
+      type: 'MULTIAI_OFFSCREEN_SUBMIT',
+      siteId: this.siteId,
       query
     });
 
@@ -35,7 +41,7 @@ export class PerplexityBridge {
       return;
     }
 
-    this.grid.setMirrorStatus('perplexity', 'Query sent. Capturing visible response...', 'busy');
+    this.grid.setMirrorStatus(this.siteId, 'Query sent. Capturing visible response...', 'busy');
     await this.pollAnswer(query);
   }
 
@@ -48,7 +54,11 @@ export class PerplexityBridge {
 
     while (Date.now() - started < 90000) {
       await sleep(2500);
-      const extracted = await this.sendBackground({ type: 'MULTIAI_PERPLEXITY_EXTRACT', query });
+      const extracted = await this.sendBackground({
+        type: 'MULTIAI_OFFSCREEN_EXTRACT',
+        siteId: this.siteId,
+        query
+      });
 
       if (!extracted.ok) {
         if (extracted.needsUserAction) {
@@ -56,8 +66,8 @@ export class PerplexityBridge {
           return null;
         }
         this.grid.setMirrorStatus(
-          'perplexity',
-          extracted.error ?? 'Waiting for Perplexity response...',
+          this.siteId,
+          extracted.error ?? `Waiting for ${this.displayName} response...`,
           'busy'
         );
         continue;
@@ -72,64 +82,69 @@ export class PerplexityBridge {
       else stableCount += 1;
       lastText = text;
 
-      this.grid.setMirrorContent('perplexity', text);
+      this.grid.setMirrorContent(this.siteId, text);
       const ready = elapsed >= minCaptureMs && stableCount >= stablePollsNeeded;
       this.grid.setMirrorStatus(
-        'perplexity',
+        this.siteId,
         ready
           ? 'Response ready to synthesize.'
-          : `Capturing Perplexity... ${text.length.toLocaleString()} characters`,
+          : `Capturing ${this.displayName}... ${text.length.toLocaleString()} characters`,
         ready ? 'ok' : 'busy'
       );
 
       if (ready) {
-        this.response = { siteId: 'perplexity', text };
+        this.response = { siteId: this.siteId, text };
         return this.response;
       }
     }
 
     if (lastText) {
-      this.response = { siteId: 'perplexity', text: lastText };
-      this.grid.setMirrorStatus('perplexity', 'Timeout; using partial response.', 'ok');
+      this.response = { siteId: this.siteId, text: lastText };
+      this.grid.setMirrorStatus(this.siteId, 'Timeout; using partial response.', 'ok');
       return this.response;
     }
 
-    this.grid.setMirrorStatus('perplexity', 'Could not capture Perplexity response.', 'fail');
+    this.grid.setMirrorStatus(this.siteId, `Could not capture ${this.displayName} response.`, 'fail');
     return null;
   }
 
   /**
-   * Return the captured Perplexity response for a synthesis run, extracting one
-   * on demand if none was captured yet. Caller is responsible for checking that
-   * Perplexity is enabled before calling.
+   * Return the captured response for a synthesis run, extracting one on demand if
+   * none was captured yet. Caller is responsible for checking that the site is
+   * enabled before calling.
    */
   async responseForSynthesis(query?: string): Promise<SiteResponse[]> {
     if (this.response?.text) return [this.response];
 
     const extracted = await this.sendBackground({
-      type: 'MULTIAI_PERPLEXITY_EXTRACT',
+      type: 'MULTIAI_OFFSCREEN_EXTRACT',
+      siteId: this.siteId,
       query
     });
     if (extracted.ok && extracted.text?.trim()) {
-      this.response = { siteId: 'perplexity', text: extracted.text.trim() };
-      this.grid.setMirrorContent('perplexity', this.response.text);
-      this.grid.setMirrorStatus('perplexity', 'Response captured for synthesis.', 'ok');
+      this.response = { siteId: this.siteId, text: extracted.text.trim() };
+      this.grid.setMirrorContent(this.siteId, this.response.text);
+      this.grid.setMirrorStatus(this.siteId, 'Response captured for synthesis.', 'ok');
       return [this.response];
     }
     return [];
   }
 
   async open(active: boolean): Promise<void> {
-    const response = await this.sendBackground({ type: 'MULTIAI_PERPLEXITY_OPEN', active });
+    const response = await this.sendBackground({
+      type: 'MULTIAI_OFFSCREEN_OPEN',
+      siteId: this.siteId,
+      active
+    });
     if (!response.ok) this.showError(response);
   }
 
   private showError(response: BackgroundResponse): void {
     const message = response.needsUserAction
-      ? 'Perplexity requires human verification. Use "Open", resolve it once, and return to the extension.'
-      : response.error ?? 'Could not use Perplexity.';
-    this.grid.setMirrorStatus('perplexity', message, 'fail');
-    this.grid.setMirrorContent('perplexity', message);
+      ? `${this.displayName} requires human verification. Use "Open", resolve it once, and return to the extension.`
+      : response.error ?? `Could not use ${this.displayName}.`;
+    this.grid.setMirrorStatus(this.siteId, message, 'fail');
+    this.grid.setMirrorContent(this.siteId, message);
   }
 
   private async sendBackground(message: BackgroundRequest): Promise<BackgroundResponse> {

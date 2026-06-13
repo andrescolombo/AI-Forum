@@ -104,12 +104,13 @@ export interface SynthesisRequest {
 
 export type DisplayMode = 'modal' | 'panel';
 
-// Background bridge for Perplexity. The UI page talks to the service worker,
-// which controls a real top-level Perplexity tab in the background.
+// Offscreen-tab bridge. The UI page talks to the service worker, which controls
+// a real top-level browser tab in the background for sites that block iframes
+// (e.g. Perplexity). `siteId` selects which offscreen adapter handles it.
 export type BackgroundRequest =
-  | { type: 'MULTIAI_PERPLEXITY_OPEN'; active?: boolean }
-  | { type: 'MULTIAI_PERPLEXITY_SUBMIT'; query: string }
-  | { type: 'MULTIAI_PERPLEXITY_EXTRACT'; query?: string }
+  | { type: 'MULTIAI_OFFSCREEN_OPEN'; siteId: SiteId; active?: boolean }
+  | { type: 'MULTIAI_OFFSCREEN_SUBMIT'; siteId: SiteId; query: string }
+  | { type: 'MULTIAI_OFFSCREEN_EXTRACT'; siteId: SiteId; query?: string }
   // Ollama proxy — routed through the service worker so the request has no
   // Origin header and Ollama does not apply its CORS 403 check.
   | { type: 'MULTIAI_OLLAMA_GENERATE'; model: string; prompt: string }

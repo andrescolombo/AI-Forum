@@ -32,13 +32,15 @@ const COMPOSE_SELECTORS = [
   'div[contenteditable="true"][tabindex="0"]'
 ] as const;
 
+// Only the reliable, send-specific anchors. We deliberately omit
+// `button[type="submit"]`: ChatGPT's model selector and "temporary chat" toggle
+// are typeless buttons (which default to type=submit) and are clickable before
+// the real send button enables, so the broad selector grabs them by mistake.
 const SUBMIT_SELECTORS = [
   'button[data-testid="send-button"]',
   'button[data-testid="composer-send-button"]',
-  'button[aria-label="Send prompt"]',
-  'button[aria-label="Send message"]',
   'button[aria-label*="send" i]',
-  'button[type="submit"]'
+  'button[aria-label*="enviar" i]'
 ] as const;
 
 const ANSWER_SELECTORS = [
@@ -71,9 +73,13 @@ export const chatgptAdapter: SiteAdapter = {
       typeIntoContentEditable(target, query);
     }
 
+    // No heuristic fallback: ChatGPT's send button is reliably identified by the
+    // selectors above. Falling back to "bottom-right clickable button" picks the
+    // wrong control (model selector / temporary-chat toggle) while send is still
+    // disabled. Instead we wait for the real button, then Enter as a last resort.
     const clicked = await waitAndClickSubmit(
       target,
-      { selectors: SUBMIT_SELECTORS, scopeSelectors: SCOPE_SELECTORS },
+      { selectors: SUBMIT_SELECTORS, scopeSelectors: SCOPE_SELECTORS, useHeuristicFallback: false },
       { timeout: 5000 }
     );
     if (!clicked) {

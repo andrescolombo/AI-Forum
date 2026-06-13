@@ -2,7 +2,7 @@
  * Entry point for the Multi-AI extension page.
  *
  * `App` is a thin orchestrator: it builds the UI components and wires them to
- * three focused managers — PreferencesManager (state), PerplexityBridge
+ * three focused managers — PreferencesManager (state), OffscreenBridge
  * (background-tab messaging) and IframeSubmitController (DOM submit retries).
  */
 
@@ -13,7 +13,7 @@ import { IframesGrid } from './components/IframesGrid';
 import { SearchBar } from './components/SearchBar';
 import { SynthesisModalView, SynthesisPanelView } from './components/SynthesisView';
 import { IframeSubmitController } from './IframeSubmitController';
-import { PerplexityBridge } from './PerplexityBridge';
+import { OffscreenBridge } from './OffscreenBridge';
 import { PreferencesManager } from './state/PreferencesManager';
 import { Synthesizer } from './Synthesizer';
 
@@ -25,7 +25,7 @@ class App {
   private panelView = new SynthesisPanelView();
   private synthesizer!: Synthesizer;
   private ollamaClient = new OllamaClient();
-  private perplexity!: PerplexityBridge;
+  private perplexity!: OffscreenBridge;
   private submitter = new IframeSubmitController();
   private mountedKey = '';
 
@@ -44,7 +44,7 @@ class App {
         void this.perplexity.open(true);
       }
     });
-    this.perplexity = new PerplexityBridge(this.grid);
+    this.perplexity = new OffscreenBridge(this.grid, 'perplexity');
 
     const root = document.getElementById('app')!;
     root.append(this.searchBar.el, this.grid.el);
